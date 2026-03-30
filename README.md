@@ -1,5 +1,8 @@
 # Open Rain — Flutter Weather App
 
+> [!NOTE]
+> This project was an experiment to see what **Google Stitch** and **Antigravity** can do. It was built entirely through pair-programming with AI to explore the current limits of agentic coding and automated UI design.
+
 A Flutter weather app focused on precipitation, featuring an animated radar map and minute-by-minute nowcasting.
 
 ## Features
