@@ -1,0 +1,40 @@
+name: flutter_weather
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.3
+
+dependencies:
+  fl_chart: ^1.2.0
+  flutter:
+    sdk: flutter
+  flutter_dotenv: ^6.0.0
+  flutter_map: ^8.2.2
+  geocoding: ^4.0.0
+  geolocator: ^14.0.2
+  http: ^1.6.0
+  intl: ^0.20.2
+  latlong2: ^0.9.1
+  provider: ^6.1.2
+  shared_preferences: ^2.5.5
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/
