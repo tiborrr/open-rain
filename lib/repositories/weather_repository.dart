@@ -23,10 +23,12 @@ class WeatherRepository {
     currentMap['latitude'] = rawData['latitude'];
     currentMap['longitude'] = rawData['longitude'];
     
+    final offsetSeconds = (rawData['utc_offset_seconds'] as num).toInt();
+    
     final current = CurrentWeather.fromJson(currentMap);
-    final hourly = HourlyForecast.fromJson(rawData['hourly']);
-    final minutely = MinutelyForecast.fromJson(rawData['minutely_15']);
-    final daily = DailyForecast.fromJson(rawData['daily']);
+    final hourly = HourlyForecast.fromJson(rawData['hourly'], offsetSeconds);
+    final minutely = MinutelyForecast.fromJson(rawData['minutely_15'], offsetSeconds);
+    final daily = DailyForecast.fromJson(rawData['daily'], offsetSeconds);
 
     final alert = _analyzeAlerts(current, minutely);
 

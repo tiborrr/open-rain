@@ -106,7 +106,7 @@ class _DailyForecastListState extends State<DailyForecastList> {
 
   @override
   Widget build(BuildContext context) {
-    final localNow = DateTime.now().add(widget.utcOffset);
+    final localNow = DateTime.now().toUtc().add(widget.utcOffset);
     final displayedCount = _isExpanded ? widget.forecast.times.length : 5;
 
     return Column(

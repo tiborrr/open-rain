@@ -56,7 +56,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     _viewModel.addListener(() {
        if (_viewModel.status == HomeStatus.success) {
-         _radarController.setFrames(_viewModel.radarFrames);
+         _radarController.setFrames(
+           _viewModel.radarFrames, 
+           initialTime: DateTime.now().toUtc(),
+         );
+
          if (!_radarController.isPlaying) {
            _radarController.play();
          }
@@ -183,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               forecast: weather.minutely,
               controller: _radarController,
               localNow: weather.localNow,
+              utcOffset: weather.utcOffset,
             ),
             const SizedBox(height: 32),
             if (weather.alert != null) ...[

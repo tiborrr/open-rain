@@ -7,24 +7,21 @@ class PrecipitationChart extends StatelessWidget {
   final MinutelyForecast forecast;
   final RadarController controller;
   final DateTime localNow;
+  final Duration utcOffset;
 
   const PrecipitationChart({
     super.key,
     required this.forecast,
     required this.controller,
     required this.localNow,
+    this.utcOffset = Duration.zero,
   });
 
   @override
   Widget build(BuildContext context) {
-    final windowStart = forecast.times.isNotEmpty
-        ? forecast.times.first
-        : DateTime.now().subtract(const Duration(hours: 2));
-    
-    // Ensure window extends at least 1 hour into the future to show forecast
-    final lastPoint = forecast.times.isNotEmpty ? forecast.times.last : DateTime.now();
-    final futureLimit = DateTime.now().add(const Duration(hours: 1));
-    final windowEnd = lastPoint.isAfter(futureLimit) ? lastPoint : futureLimit;
+    final now = DateTime.now().toUtc();
+    final windowStart = now.subtract(const Duration(hours: 1));
+    final windowEnd = now.add(const Duration(hours: 2));
 
     List<FlSpot> spots = [];
     double maxPrecip = 0;
@@ -88,7 +85,7 @@ class PrecipitationChart extends StatelessWidget {
                         if (event is FlPanUpdateEvent || event is FlPanDownEvent || event is FlTapDownEvent) {
                           if (touchResponse != null && touchResponse.lineBarSpots != null) {
                             final x = touchResponse.lineBarSpots!.first.x;
-                            controller.seekTo(DateTime.fromMillisecondsSinceEpoch(x.toInt()));
+                            controller.seekTo(DateTime.fromMillisecondsSinceEpoch(x.toInt(), isUtc: true));
                           }
                         }
                       },
@@ -96,7 +93,7 @@ class PrecipitationChart extends StatelessWidget {
                     extraLinesData: ExtraLinesData(
                       verticalLines: [
                         VerticalLine(
-                          x: localNow.millisecondsSinceEpoch.toDouble(),
+                          x: localNow.subtract(utcOffset).millisecondsSinceEpoch.toDouble(),
                           color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
                           strokeWidth: 1.5,
                           label: VerticalLineLabel(
@@ -126,7 +123,8 @@ class PrecipitationChart extends StatelessWidget {
                           showTitles: true,
                           interval: 1800000,
                           getTitlesWidget: (value, meta) {
-                            final time = DateTime.fromMillisecondsSinceEpoch(value.toInt());
+                            // Convert UTC x-axis value to location local time
+                            final time = DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).add(utcOffset);
                             return Text(
                               '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
                               style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),

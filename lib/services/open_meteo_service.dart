@@ -60,7 +60,7 @@ class OpenMeteoService implements WeatherProvider {
           'longitude': lon.toString(),
           'current': 'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_gusts_10m',
           'minutely_15': 'precipitation',
-          'timezone': 'UTC',
+          'timezone': 'auto',
         };
 
         if (start != null && end != null) {
@@ -91,7 +91,7 @@ class OpenMeteoService implements WeatherProvider {
           'latitude': lat.toString(),
           'longitude': lon.toString(),
           'hourly': 'temperature_2m,precipitation_probability,weather_code,wind_gusts_10m',
-          'timezone': 'UTC',
+          'timezone': 'auto',
           'forecast_days': '14',
         };
 
@@ -123,7 +123,7 @@ class OpenMeteoService implements WeatherProvider {
           'latitude': lat.toString(),
           'longitude': lon.toString(),
           'daily': 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum',
-          'timezone': 'UTC',
+          'timezone': 'auto',
           'forecast_days': '14',
         });
         final response = await http.get(url);
@@ -147,7 +147,7 @@ class OpenMeteoService implements WeatherProvider {
           'latitude': lat.toString(),
           'longitude': lon.toString(),
           'current': 'european_aqi,pm2_5,ozone',
-          'timezone': 'UTC',
+          'timezone': 'auto',
         });
         final response = await http.get(url);
         if (response.statusCode == 200) {
