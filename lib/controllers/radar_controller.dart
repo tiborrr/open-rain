@@ -12,9 +12,13 @@ class RadarController extends ChangeNotifier {
   RadarFrame? get currentFrame => _frames.isEmpty ? null : _frames[_currentIndex];
   bool get isPlaying => _timer != null;
 
-  void setFrames(List<RadarFrame> newFrames) {
+  void setFrames(List<RadarFrame> newFrames, {DateTime? initialTime}) {
     _frames = newFrames;
-    _currentIndex = 0;
+    if (initialTime != null) {
+      seekTo(initialTime);
+    } else {
+      _currentIndex = 0;
+    }
     notifyListeners();
   }
 

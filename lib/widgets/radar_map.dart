@@ -76,7 +76,7 @@ class _RadarMapState extends State<RadarMap> {
               return Opacity(
                 opacity: 0.8,
                 child: TileLayer(
-                  key: ValueKey(frame.path),
+                  key: ValueKey(frame.frameId),
                   urlTemplate: config.urlTemplate,
                   wmsOptions: config.wmsOptions,
                   tileProvider: config.apiClient != null

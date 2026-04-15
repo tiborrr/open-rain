@@ -33,8 +33,8 @@ class KnmiError extends KnmiResult {
 /// Callers call [get] and switch on [KnmiResult]. No status codes, no
 /// exception handling, no [block] calls required.
 class KnmiApiClient {
-  // --- Rate limit: 20 req/s ---
-  static const Duration _minInterval = Duration(milliseconds: 50);
+  // --- Rate limit: ~6 req/s to prevent 429 Too Many Requests (KNMI limits strictly) ---
+  static const Duration _minInterval = Duration(milliseconds: 150);
 
   // --- Hourly quota: 1000 req/3600s ---
   static const int _quotaMax = 1000;
@@ -52,8 +52,29 @@ class KnmiApiClient {
   // Circuit breaker
   DateTime? _blockedUntil;
 
+  // Fallback state
+  bool _useAnonymousFallback = false;
+
   bool get isBlocked =>
       _blockedUntil != null && DateTime.now().isBefore(_blockedUntil!);
+
+  /// Automatically rewrites the URI to the anonymous host if fallback is active.
+  Uri _applyFallbackUri(Uri uri) {
+    if (_useAnonymousFallback && uri.host == 'api.dataplatform.knmi.nl') {
+      return uri.replace(host: 'anonymous.api.dataplatform.knmi.nl');
+    }
+    return uri;
+  }
+
+  /// Automatically strips the Authorization header if fallback is active.
+  Map<String, String>? _applyFallbackHeaders(Map<String, String>? headers) {
+    if (_useAnonymousFallback && headers != null) {
+      final newHeaders = Map<String, String>.from(headers);
+      newHeaders.remove('Authorization');
+      return newHeaders;
+    }
+    return headers;
+  }
 
   /// Makes a GET request to [uri], fully respecting the rate limit, quota,
   /// and any active circuit breaker.
@@ -74,17 +95,30 @@ class KnmiApiClient {
     _refreshQuotaWindow();
     if (_requestsInWindow >= _quotaMax) {
       _triggerCircuitBreaker(reason: 'local quota counter reached');
-      return KnmiQuotaExceeded(_blockedUntil!);
+      if (isBlocked) return KnmiQuotaExceeded(_blockedUntil!);
     }
 
     _requestsInWindow++;
 
-    final response = await http.get(uri, headers: headers);
+    final targetUri = _applyFallbackUri(uri);
+    final targetHeaders = _applyFallbackHeaders(headers);
+
+    final response = await http.get(targetUri, headers: targetHeaders);
 
     // Detect quota exhaustion from the server
     if (_isQuotaExceededResponse(response)) {
-      _triggerCircuitBreaker(reason: 'server quota exceeded response');
-      return KnmiQuotaExceeded(_blockedUntil!);
+      _triggerCircuitBreaker(reason: 'server quota/rate exceeded response');
+      if (isBlocked) return KnmiQuotaExceeded(_blockedUntil!);
+      
+      // If we just switched to fallback, retry the request once on the anonymous endpoint
+      final retryUri = _applyFallbackUri(uri);
+      final retryHeaders = _applyFallbackHeaders(headers);
+      final retryResponse = await http.get(retryUri, headers: retryHeaders);
+      
+      if (retryResponse.statusCode != 200) {
+        return KnmiError(retryResponse.statusCode, retryResponse.body);
+      }
+      return KnmiSuccess(retryResponse);
     }
 
     if (response.statusCode != 200) {
@@ -151,21 +185,33 @@ class KnmiApiClient {
 
   bool _isQuotaExceededResponse(http.Response response) {
     if (response.statusCode == 403) return true;
+    if (response.statusCode == 429) return true; // Too many requests
     if (response.body.contains('"Quota exceeded"')) return true;
     return false;
   }
 
   void _triggerCircuitBreaker({required String reason}) {
-    if (isBlocked) return; // Already open — stay silent
+    if (_useAnonymousFallback) {
+      if (isBlocked) return; // Already open — stay silent
 
-    // Block until the next hour boundary to align with KNMI's renewal
-    final now = DateTime.now();
-    final nextHour = DateTime(now.year, now.month, now.day, now.hour + 1);
-    _blockedUntil = nextHour;
+      // Block until the next hour boundary to align with KNMI's renewal
+      final now = DateTime.now();
+      final nextHour = DateTime(now.year, now.month, now.day, now.hour + 1);
+      _blockedUntil = nextHour;
 
-    debugPrint(
-      'KnmiApiClient: Circuit breaker opened ($reason). '
-      'Requests blocked until $nextHour (next hour boundary).',
-    );
+      debugPrint(
+        'KnmiApiClient: Circuit breaker opened in anonymous fallback ($reason). '
+        'Requests blocked until $nextHour.',
+      );
+    } else {
+      _useAnonymousFallback = true;
+      _requestsInWindow = 0; // Reset local quota tracking for fallback
+      
+      debugPrint(
+        'KnmiApiClient: Primary API limits exceeded ($reason). '
+        'Switching to anonymous API fallback.',
+      );
+    }
   }
 }
+

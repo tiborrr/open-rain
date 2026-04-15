@@ -67,13 +67,13 @@ class RainViewerService extends RadarProvider {
           final List<Map<String, dynamic>> frames = [];
           for (var item in past) {
             frames.add({
-              'path': item['path'],
+              'frameId': item['path'],
               'time': DateTime.fromMillisecondsSinceEpoch(item['time'] * 1000).toIso8601String(),
             });
           }
           for (var item in nowcast) {
             frames.add({
-              'path': item['path'],
+              'frameId': item['path'],
               'time': DateTime.fromMillisecondsSinceEpoch(item['time'] * 1000).toIso8601String(),
             });
           }
@@ -93,7 +93,7 @@ class RainViewerService extends RadarProvider {
   @override
   RadarLayerConfig getLayerConfig(RadarFrame frame) {
     return RadarLayerConfig(
-      urlTemplate: 'https://tilecache.rainviewer.com${frame.path}/256/{z}/{x}/{y}/2/1_1.png',
+      urlTemplate: 'https://tilecache.rainviewer.com${frame.frameId}/256/{z}/{x}/{y}/2/1_1.png',
     );
   }
 }
