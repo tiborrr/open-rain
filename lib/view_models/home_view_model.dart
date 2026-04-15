@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import '../models/weather_models.dart';
 import '../models/radar_frame.dart';
 import '../repositories/weather_repository.dart';
@@ -20,6 +21,8 @@ class HomeViewModel extends ChangeNotifier {
 
   Position? _lastUpdatePosition;
   static const double _moveThreshold = 100.0; // Meters
+
+  final Map<LatLng, MinutelyForecast> _neighborForecasts = {};
 
   HomeViewModel({
     required WeatherRepository weatherRepository,
@@ -107,8 +110,15 @@ class HomeViewModel extends ChangeNotifier {
       }
       
       // Start independent tasks in parallel
-      final cityFuture = _locationService.getCityFromCoordinates(lat, lon);
-      final framesFuture = _radarRepository.getRadarFrames();
+      final cityFuture = _locationService.getCityFromCoordinates(lat, lon).catchError((e) {
+        debugPrint('Failed to get city name: $e');
+        return null;
+      });
+      
+      final framesFuture = _radarRepository.getRadarFrames().catchError((e) {
+        debugPrint('Failed to get radar frames: $e');
+        return <RadarFrame>[]; // Return empty list rather than failing
+      });
 
       // We need frames to get time bounds for weather fetching, but we can await them separately
       final results = await Future.wait([cityFuture, framesFuture]);
@@ -129,10 +139,13 @@ class HomeViewModel extends ChangeNotifier {
         lon: lon,
         startTime: startTime,
         endTime: endTime,
-      );
+      ); // If weather mapping fails entirely, we still want it to throw so we show the error state
 
       final precipFuture = _radarFrames.isNotEmpty 
-          ? _radarRepository.getPrecipitationSeries(lat: lat, lon: lon, frames: _radarFrames)
+          ? _radarRepository.getPrecipitationSeries(lat: lat, lon: lon, frames: _radarFrames).catchError((e) {
+              debugPrint('Failed to get precipitation series: $e');
+              return null; // Swallow error to prevent crashing entire dashboard
+            })
           : Future<MinutelyForecast?>.value(null);
 
       final weatherResults = await Future.wait([weatherFuture, precipFuture]);
@@ -148,12 +161,20 @@ class HomeViewModel extends ChangeNotifier {
           utcOffset: weatherData.utcOffset,
           timezone: weatherData.timezone,
           alert: weatherData.alert,
+          airQuality: weatherData.airQuality,
+          neighbors: Map.from(_neighborForecasts),
         );
       } else {
         _weatherData = weatherData;
       }
 
       _status = HomeStatus.success;
+      notifyListeners();
+
+      // 3. Kick off background neighbor fetching (don't await)
+      if (_radarFrames.isNotEmpty) {
+        _fetchNeighbors(lat, lon, _radarFrames);
+      }
     } catch (e) {
       _status = HomeStatus.error;
       _errorMessage = e.toString();
@@ -175,5 +196,57 @@ class HomeViewModel extends ChangeNotifier {
 
   Future<List<LocationResult>> searchCities(String query) async {
     return await _locationService.searchLocations(query);
+  }
+
+  Future<void> _fetchNeighbors(double lat, double lon, List<RadarFrame> frames) async {
+    _neighborForecasts.clear();
+
+    // Define a 3x3 grid around the user (~15km steps)
+    const offsets = [-0.15, 0.0, 0.15];
+    final List<LatLng> points = [];
+    for (var dLat in offsets) {
+      for (var dLon in offsets) {
+        if (dLat == 0 && dLon == 0) continue; // Skip center (already fetched)
+        points.add(LatLng(lat + dLat, lon + dLon));
+      }
+    }
+
+    // Sort by distance (Nearest first)
+    points.sort((a, b) {
+      final distA = Geolocator.distanceBetween(lat, lon, a.latitude, a.longitude);
+      final distB = Geolocator.distanceBetween(lat, lon, b.latitude, b.longitude);
+      return distA.compareTo(distB);
+    });
+
+    for (var point in points) {
+      try {
+        final forecast = await _radarRepository.getPrecipitationSeries(
+          lat: point.latitude,
+          lon: point.longitude,
+          frames: frames,
+        );
+
+        if (forecast != null) {
+          _neighborForecasts[point] = forecast;
+          // Optimistically update weather data with the new neighbor
+          if (_weatherData != null) {
+            _weatherData = WeatherData(
+              current: _weatherData!.current,
+              hourly: _weatherData!.hourly,
+              minutely: _weatherData!.minutely,
+              daily: _weatherData!.daily,
+              utcOffset: _weatherData!.utcOffset,
+              timezone: _weatherData!.timezone,
+              alert: _weatherData!.alert,
+              airQuality: _weatherData!.airQuality,
+              neighbors: Map.from(_neighborForecasts),
+            );
+            notifyListeners();
+          }
+        }
+      } catch (e) {
+        debugPrint('Background neighbor fetch failed for $point: $e');
+      }
+    }
   }
 }
