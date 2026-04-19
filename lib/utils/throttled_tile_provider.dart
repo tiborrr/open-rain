@@ -4,21 +4,40 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'knmi_api_client.dart';
+import 'knmi_raster_tile_cache.dart';
 
 /// A TileProvider that routes all network requests through [KnmiApiClient].
 ///
 /// When the circuit breaker is open (quota exceeded), tiles are silently
 /// replaced with a transparent image — no exceptions, no log spam.
+///
+/// Successful tile bytes are kept in [KnmiRasterTileCache] so panning, animation
+/// loops, and background dashboard reloads do not re-hit KNMI for the same URL.
+/// Call [bumpImageCacheGeneration] on manual refresh so Flutter's [ImageCache]
+/// does not keep decoding stale providers for the same URL.
 class KnmiTileProvider extends TileProvider {
   final KnmiApiClient apiClient;
 
+  static int _imageCacheGeneration = 0;
+
+  /// Invalidate decoded image entries tied to the previous generation (manual refresh only).
+  static void bumpImageCacheGeneration() => _imageCacheGeneration++;
+
+  final int _cacheGeneration;
+
   KnmiTileProvider({required this.apiClient, Map<String, String>? headers})
-      : super(headers: headers ?? {});
+      : _cacheGeneration = _imageCacheGeneration,
+        super(headers: headers ?? {});
 
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
     final url = getTileUrl(coordinates, options);
-    return _KnmiTileImage(url, apiClient: apiClient, headers: headers);
+    return _KnmiTileImage(
+      url,
+      apiClient: apiClient,
+      headers: headers,
+      cacheGeneration: _cacheGeneration,
+    );
   }
 }
 
@@ -26,8 +45,14 @@ class _KnmiTileImage extends ImageProvider<_KnmiTileImage> {
   final String url;
   final KnmiApiClient apiClient;
   final Map<String, String>? headers;
+  final int cacheGeneration;
 
-  _KnmiTileImage(this.url, {required this.apiClient, this.headers});
+  _KnmiTileImage(
+    this.url, {
+    required this.apiClient,
+    this.headers,
+    required this.cacheGeneration,
+  });
 
   @override
   Future<_KnmiTileImage> obtainKey(ImageConfiguration configuration) {
@@ -49,25 +74,35 @@ class _KnmiTileImage extends ImageProvider<_KnmiTileImage> {
     );
   }
 
+  Future<ui.Codec> _decodeBytes(Uint8List bytes, ImageDecoderCallback decode) async =>
+      decode(await ui.ImmutableBuffer.fromUint8List(bytes));
+
   Future<ui.Codec> _load(
     _KnmiTileImage key,
     StreamController<ImageChunkEvent> chunkEvents,
     ImageDecoderCallback decode,
   ) async {
     try {
-      // Fast path: if the circuit breaker is already open, skip the queue
-      if (apiClient.isBlocked) {
+      final cached = KnmiRasterTileCache.instance.get(key.url);
+      if (cached != null && cached.isNotEmpty) {
+        return _decodeBytes(cached, decode);
+      }
+
+      if (key.apiClient.isBlocked) {
         return _transparent();
       }
 
-      final result = await apiClient.get(
+      final result = await key.apiClient.get(
         Uri.parse(key.url),
         headers: key.headers,
       );
 
       return switch (result) {
-        KnmiSuccess s when s.response.bodyBytes.isNotEmpty =>
-          decode(await ui.ImmutableBuffer.fromUint8List(s.response.bodyBytes)),
+        KnmiSuccess s when s.response.bodyBytes.isNotEmpty => () {
+            final body = s.response.bodyBytes;
+            KnmiRasterTileCache.instance.put(key.url, body);
+            return _decodeBytes(body, decode);
+          }(),
         KnmiQuotaExceeded _ => _transparent(),
         KnmiSuccess _ => _transparent(), // empty body
         KnmiError e => throw Exception(
@@ -99,8 +134,10 @@ class _KnmiTileImage extends ImageProvider<_KnmiTileImage> {
 
   @override
   bool operator ==(Object other) =>
-      other is _KnmiTileImage && other.url == url;
+      other is _KnmiTileImage &&
+      other.url == url &&
+      other.cacheGeneration == cacheGeneration;
 
   @override
-  int get hashCode => url.hashCode;
+  int get hashCode => Object.hash(url, cacheGeneration);
 }

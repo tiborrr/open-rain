@@ -1,24 +1,24 @@
 class RadarFrame {
-  final String path;
+  final String frameId;
   final DateTime time;
 
-  RadarFrame({required this.path, required this.time});
+  RadarFrame({required this.frameId, required this.time});
 
   Map<String, dynamic> toJson() => {
-        'path': path,
+        'frameId': frameId,
         'time': time.toIso8601String(),
       };
 
   factory RadarFrame.fromJson(Map<String, dynamic> json) => RadarFrame(
-        path: json['path'],
+        frameId: json['frameId'],
         time: DateTime.parse(json['time']),
       );
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is RadarFrame && runtimeType == other.runtimeType && path == other.path && time == other.time;
+      other is RadarFrame && runtimeType == other.runtimeType && frameId == other.frameId && time == other.time;
 
   @override
-  int get hashCode => path.hashCode ^ time.hashCode;
+  int get hashCode => frameId.hashCode ^ time.hashCode;
 }

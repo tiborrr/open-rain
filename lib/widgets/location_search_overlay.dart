@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../view_models/home_view_model.dart';
-import '../services/location_service.dart';
 
+import '../services/location_service.dart';
+import '../utils/result.dart';
+import '../view_models/home_view_model.dart';
+
+/// Search overlay reading the shared [HomeViewModel] from the surrounding
+/// `Provider`.
+///
+/// Wraps `viewModel.searchCities` (a `Command1`) so progress and error state
+/// come from the command itself instead of being re-implemented locally.
 class LocationSearchOverlay extends StatefulWidget {
   const LocationSearchOverlay({super.key});
 
@@ -12,23 +19,19 @@ class LocationSearchOverlay extends StatefulWidget {
 
 class _LocationSearchOverlayState extends State<LocationSearchOverlay> {
   final TextEditingController _searchController = TextEditingController();
-  List<LocationResult> _results = [];
-  bool _isSearching = false;
 
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) {
-      setState(() => _results = []);
+      context.read<HomeViewModel>().searchCities.clearResult();
       return;
     }
+    await context.read<HomeViewModel>().searchCities.execute(query);
+  }
 
-    setState(() => _isSearching = true);
-    final results = await context.read<HomeViewModel>().searchCities(query);
-    if (mounted) {
-      setState(() {
-        _results = results;
-        _isSearching = false;
-      });
-    }
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -73,26 +76,43 @@ class _LocationSearchOverlayState extends State<LocationSearchOverlay> {
                   Navigator.pop(context);
                 },
               ),
-              if (_isSearching)
-                const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: CircularProgressIndicator(),
-                ),
+              ListenableBuilder(
+                listenable: viewModel.searchCities,
+                builder: (context, _) {
+                  if (viewModel.searchCities.running) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
               Expanded(
-                child: ListView.builder(
-                  itemCount: _results.length,
-                  itemBuilder: (context, index) {
-                    final result = _results[index];
-                    return ListTile(
-                      leading: const Icon(Icons.location_city),
-                      title: Text(result.name),
-                      onTap: () {
-                        viewModel.setManualLocation(
-                          result.latitude,
-                          result.longitude,
-                          result.name,
+                child: ListenableBuilder(
+                  listenable: viewModel.searchCities,
+                  builder: (context, _) {
+                    final result = viewModel.searchCities.result;
+                    final results = switch (result) {
+                      Ok<List<LocationResult>>(value: final v) => v,
+                      _ => const <LocationResult>[],
+                    };
+                    return ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (context, index) {
+                        final result = results[index];
+                        return ListTile(
+                          leading: const Icon(Icons.location_city),
+                          title: Text(result.name),
+                          onTap: () {
+                            viewModel.setManualLocation(
+                              result.latitude,
+                              result.longitude,
+                              result.name,
+                            );
+                            Navigator.pop(context);
+                          },
                         );
-                        Navigator.pop(context);
                       },
                     );
                   },

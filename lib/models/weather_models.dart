@@ -1,3 +1,5 @@
+import 'package:latlong2/latlong.dart';
+
 class WeatherData {
   final CurrentWeather current;
   final HourlyForecast hourly;
@@ -7,6 +9,9 @@ class WeatherData {
   final String timezone;
   final WeatherAlert? alert;
   final AirQuality? airQuality;
+  
+  /// Surrounding precipitation data points, mapped by their coordinates.
+  final Map<LatLng, MinutelyForecast> neighbors;
 
   WeatherData({
     required this.current,
@@ -17,16 +22,24 @@ class WeatherData {
     required this.timezone,
     this.alert,
     this.airQuality,
+    this.neighbors = const {},
   });
 
   /// The current time at the weather location.
   DateTime get localNow => DateTime.now().toUtc().add(utcOffset);
 
-  static DateTime parseUtc(String t) {
+  /// Converts a UTC [time] to the local time at the weather location.
+  DateTime toLocalLocation(DateTime utc) => utc.toUtc().add(utcOffset);
+
+  /// Parses a time string from the API.
+  /// If [offsetSeconds] is provided, it assumes the input is local time and converts it to UTC.
+  static DateTime parseTime(String t, [int offsetSeconds = 0]) {
     if (t.contains('T')) {
-      return DateTime.parse(t.endsWith('Z') ? t : '${t}Z');
+      final dt = DateTime.parse(t.endsWith('Z') ? t : '${t}Z');
+      return dt.subtract(Duration(seconds: offsetSeconds));
     } else {
-      return DateTime.parse('${t}T00:00:00Z');
+      final dt = DateTime.parse('${t}T00:00:00Z');
+      return dt.subtract(Duration(seconds: offsetSeconds));
     }
   }
 }
@@ -74,9 +87,9 @@ class HourlyForecast {
     required this.weatherCodes,
   });
 
-  factory HourlyForecast.fromJson(Map<String, dynamic> json) {
+  factory HourlyForecast.fromJson(Map<String, dynamic> json, [int offsetSeconds = 0]) {
     return HourlyForecast(
-      times: (json['time'] as List).map((t) => WeatherData.parseUtc(t.toString())).toList(),
+      times: (json['time'] as List).map((t) => WeatherData.parseTime(t.toString(), offsetSeconds)).toList(),
       temperatures: (json['temperature_2m'] as List).map((t) => (t as num).toDouble()).toList(),
       weatherCodes: (json['weather_code'] as List).map((c) => (c as num).toInt()).toList(),
     );
@@ -92,11 +105,32 @@ class MinutelyForecast {
     required this.precipitation,
   });
 
-  factory MinutelyForecast.fromJson(Map<String, dynamic> json) {
+  factory MinutelyForecast.fromJson(Map<String, dynamic> json, [int offsetSeconds = 0]) {
     return MinutelyForecast(
-      times: (json['time'] as List).map((t) => WeatherData.parseUtc(t.toString())).toList(),
+      times: (json['time'] as List).map((t) => WeatherData.parseTime(t.toString(), offsetSeconds)).toList(),
       precipitation: (json['precipitation'] as List).map((p) => (p as num).toDouble()).toList(),
     );
+  }
+
+  /// Returns the entry of [times] closest to [epochMsUtc] (UTC milliseconds).
+  ///
+  /// Used by the precipitation chart scrubber to snap touch positions onto the
+  /// Open-Meteo 15-minute grid instead of arbitrary axis pixels. Returns `null`
+  /// when [times] is empty. On exact ties, the earlier timestamp wins so the
+  /// behavior is deterministic.
+  DateTime? nearestTimeUtcToMillis(int epochMsUtc) {
+    if (times.isEmpty) return null;
+    DateTime best = times.first;
+    int bestDiff = (best.millisecondsSinceEpoch - epochMsUtc).abs();
+    for (int i = 1; i < times.length; i++) {
+      final t = times[i];
+      final diff = (t.millisecondsSinceEpoch - epochMsUtc).abs();
+      if (diff < bestDiff) {
+        best = t;
+        bestDiff = diff;
+      }
+    }
+    return best;
   }
 }
 
@@ -113,9 +147,9 @@ class DailyForecast {
     required this.weatherCodes,
   });
 
-  factory DailyForecast.fromJson(Map<String, dynamic> json) {
+  factory DailyForecast.fromJson(Map<String, dynamic> json, [int offsetSeconds = 0]) {
     return DailyForecast(
-      times: (json['time'] as List).map((t) => WeatherData.parseUtc(t.toString())).toList(),
+      times: (json['time'] as List).map((t) => WeatherData.parseTime(t.toString(), offsetSeconds)).toList(),
       maxTemps: (json['temperature_2m_max'] as List).map((t) => (t as num).toDouble()).toList(),
       minTemps: (json['temperature_2m_min'] as List).map((t) => (t as num).toDouble()).toList(),
       weatherCodes: (json['weather_code'] as List).map((c) => (c as num).toInt()).toList(),

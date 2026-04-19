@@ -1,241 +1,212 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
+
+import '../models/weather_models.dart';
 import '../providers/weather_provider.dart';
+import '../utils/cache_store.dart';
+import '../utils/result.dart';
 
+/// Open-Meteo client. Composes 4 endpoints (current/minutely, hourly, daily,
+/// air quality) and parses them into a single [WeatherData] (no alert).
+///
+/// All endpoints share one [CacheStore]: the previous implementation
+/// inlined identical SharedPreferences logic three times.
 class OpenMeteoService implements WeatherProvider {
-  DateTime _calculateNextAlignedExpiration(int intervalMinutes, int delayMinutes) {
-    final now = DateTime.now();
-    final totalMinutes = now.millisecondsSinceEpoch ~/ 60000;
-    
-    final shiftedMinutes = totalMinutes - delayMinutes;
-    final currentAligned = (shiftedMinutes ~/ intervalMinutes) * intervalMinutes;
-    final nextAligned = currentAligned + intervalMinutes;
-    final expirationMinutes = nextAligned + delayMinutes;
-    
-    return DateTime.fromMillisecondsSinceEpoch(expirationMinutes * 60000);
-  }
+  OpenMeteoService({
+    CacheStore? cacheStore,
+    http.Client? httpClient,
+  })  : _cache = cacheStore ?? CacheStore(),
+        _http = httpClient ?? http.Client();
 
-  Future<dynamic> _getCachedOrFetch({
-    required String cacheKey,
-    required Future<dynamic> Function() fetchFunction,
-    required DateTime expirationTime,
+  static const String _host = 'api.open-meteo.com';
+  static const String _airQualityHost = 'air-quality-api.open-meteo.com';
+
+  /// Cap for how many 15-min steps we ever request from Open-Meteo. Open-Meteo
+  /// publishes minutely_15 up to ~16 days; we never need more than the radar
+  /// horizon (~2-3 h). Acts as a safety bound on the count derived from
+  /// `endTime`.
+  static const int _maxMinutelyForecastSteps = 192;
+
+  final CacheStore _cache;
+  final http.Client _http;
+
+  @override
+  Future<Result<WeatherData>> fetchWeather({
+    required double lat,
+    required double lon,
+    DateTime? startTime,
+    DateTime? endTime,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    final cachedDataString = prefs.getString('${cacheKey}_data');
-    final expirationString = prefs.getString('${cacheKey}_expiration');
-
-    if (cachedDataString != null && expirationString != null) {
-      final expiration = DateTime.parse(expirationString);
-      if (DateTime.now().isBefore(expiration)) {
-        return json.decode(cachedDataString);
-      }
-    }
-
     try {
-      final data = await fetchFunction();
-      if (data != null) {
-        await prefs.setString('${cacheKey}_data', json.encode(data));
-        await prefs.setString('${cacheKey}_expiration', expirationTime.toIso8601String());
-      }
-      return data;
+      final results = await Future.wait([
+        _fetchMinutely(lat, lon, start: startTime, end: endTime),
+        _fetchHourly(lat, lon),
+        _fetchDaily(lat, lon),
+        _fetchAirQuality(lat, lon),
+      ]);
+
+      final minutelyJson = results[0];
+      final hourlyJson = results[1];
+      final dailyJson = results[2];
+      final airQualityJson = results[3];
+
+      final offsetSeconds = (minutelyJson['utc_offset_seconds'] as num).toInt();
+      final currentMap = Map<String, dynamic>.from(minutelyJson['current']);
+      currentMap['latitude'] = minutelyJson['latitude'];
+      currentMap['longitude'] = minutelyJson['longitude'];
+
+      return Result.ok(
+        WeatherData(
+          current: CurrentWeather.fromJson(currentMap),
+          hourly: HourlyForecast.fromJson(hourlyJson['hourly'], offsetSeconds),
+          minutely: MinutelyForecast.fromJson(
+              minutelyJson['minutely_15'], offsetSeconds),
+          daily: DailyForecast.fromJson(dailyJson['daily'], offsetSeconds),
+          utcOffset: Duration(seconds: offsetSeconds),
+          timezone: minutelyJson['timezone'] as String,
+          airQuality: airQualityJson['current'] != null
+              ? AirQuality.fromJson(
+                  Map<String, dynamic>.from(airQualityJson['current']))
+              : null,
+        ),
+      );
+    } on Exception catch (e) {
+      return Result.err(e);
     } catch (e) {
-      if (cachedDataString != null) {
-        return json.decode(cachedDataString);
-      }
-      rethrow;
+      return Result.err(Exception(e.toString()));
     }
   }
 
-  Future<Map<String, dynamic>> _fetchMinutelyWeather(double lat, double lon, {DateTime? start, DateTime? end}) async {
-    final cacheKey = 'weather_minutely_${lat}_$lon${start?.millisecondsSinceEpoch}${end?.millisecondsSinceEpoch}';
-    final result = await _getCachedOrFetch(
-      cacheKey: cacheKey,
-      expirationTime: _calculateNextAlignedExpiration(15, 2),
-      fetchFunction: () async {
-        final params = {
+  Future<Map<String, dynamic>> _fetchMinutely(
+    double lat,
+    double lon, {
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    // Use count-based windowing (`past_minutely_15` / `forecast_minutely_15`)
+    // instead of `start_minutely_15` / `end_minutely_15`.
+    //
+    // Open-Meteo with `timezone=auto` interprets absolute `start_*`/`end_*`
+    // values as the *location's local time*. Sending UTC ISO strings was
+    // therefore being read as local time, which silently shifted the chart
+    // window by the location's UTC offset (e.g. 2h of "past" data instead of
+    // the requested future window for Europe in DST).
+    //
+    // Counts are timezone-agnostic and always anchored at "now".
+    final forecastSteps = _forecastMinutelyStepsFor(end);
+    final key = 'weather_minutely_${lat}_${lon}_$forecastSteps';
+    final raw = await _cache.getOrFetch(
+      key: key,
+      expiresAt: CacheExpiration.alignedNext(15, 2),
+      fetch: () async {
+        final params = <String, String>{
           'latitude': lat.toString(),
           'longitude': lon.toString(),
-          'current': 'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_gusts_10m',
+          'current':
+              'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_gusts_10m',
           'minutely_15': 'precipitation',
-          'timezone': 'UTC',
+          'timezone': 'auto',
+          'past_minutely_15': '0',
+          'forecast_minutely_15': forecastSteps.toString(),
         };
-
-        if (start != null && end != null) {
-          final df = DateFormat('yyyy-MM-ddTHH:mm');
-          params['start_minutely_15'] = df.format(start);
-          params['end_minutely_15'] = df.format(end);
-        }
-
-        final url = Uri.https('api.open-meteo.com', '/v1/forecast', params);
-        final response = await http.get(url);
-        if (response.statusCode == 200) {
-          return json.decode(response.body);
-        } else {
-          throw Exception('Failed to load minutely weather data');
-        }
+        return _getJson(Uri.https(_host, '/v1/forecast', params),
+            failure: 'Failed to load minutely weather data');
       },
     );
-    return Map<String, dynamic>.from(result);
+    return Map<String, dynamic>.from(raw);
   }
 
-  Future<Map<String, dynamic>> _fetchHourlyWeather(double lat, double lon, {DateTime? start, DateTime? end}) async {
-    final cacheKey = 'weather_hourly_${lat}_$lon${start?.millisecondsSinceEpoch}${end?.millisecondsSinceEpoch}';
-    final result = await _getCachedOrFetch(
-      cacheKey: cacheKey,
-      expirationTime: _calculateNextAlignedExpiration(60, 2),
-      fetchFunction: () async {
-        final params = {
-          'latitude': lat.toString(),
-          'longitude': lon.toString(),
-          'hourly': 'temperature_2m,precipitation_probability,weather_code,wind_gusts_10m',
-          'timezone': 'UTC',
-          'forecast_days': '14',
-        };
-
-        if (start != null && end != null) {
-          final df = DateFormat('yyyy-MM-ddTHH:mm');
-          params['start_hour'] = df.format(start);
-          params['end_hour'] = df.format(end);
-        }
-
-        final url = Uri.https('api.open-meteo.com', '/v1/forecast', params);
-        final response = await http.get(url);
-        if (response.statusCode == 200) {
-          return json.decode(response.body);
-        } else {
-          throw Exception('Failed to load hourly weather data');
-        }
-      },
-    );
-    return Map<String, dynamic>.from(result);
+  /// Number of 15-min steps from "now" that covers up to [end], inclusive.
+  ///
+  /// Open-Meteo returns N points where the LAST point sits at
+  /// `start + (N - 1) * 15 min`. Using `ceil(minutesAhead / 15)` would place
+  /// the final sample one bucket *short* of [end], so the chart would stop
+  /// ~15 min before the last radar frame. We add one step to guarantee
+  /// `times.last >= end`. The caller (HomeViewModel) clips the KNMI frame
+  /// list to the actual returned range, so a tiny overshoot is harmless.
+  int _forecastMinutelyStepsFor(DateTime? end) {
+    const fallback = 12; // 3 hours
+    if (end == null) return fallback;
+    final minutesAhead =
+        end.toUtc().difference(DateTime.now().toUtc()).inMinutes;
+    if (minutesAhead <= 0) return 2;
+    final steps = ((minutesAhead + 14) ~/ 15) + 1;
+    if (steps > _maxMinutelyForecastSteps) return _maxMinutelyForecastSteps;
+    return steps;
   }
 
-  Future<Map<String, dynamic>> _fetchDailyWeather(double lat, double lon) async {
-    final cacheKey = 'weather_daily_${lat}_$lon';
-    final result = await _getCachedOrFetch(
-      cacheKey: cacheKey,
-      expirationTime: _calculateNextAlignedExpiration(360, 5),
-      fetchFunction: () async {
-        final url = Uri.https('api.open-meteo.com', '/v1/forecast', {
+  Future<Map<String, dynamic>> _fetchHourly(double lat, double lon) async {
+    final key = 'weather_hourly_${lat}_$lon';
+    final raw = await _cache.getOrFetch(
+      key: key,
+      expiresAt: CacheExpiration.alignedNext(60, 2),
+      fetch: () => _getJson(
+        Uri.https(_host, '/v1/forecast', {
           'latitude': lat.toString(),
           'longitude': lon.toString(),
-          'daily': 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum',
-          'timezone': 'UTC',
+          'hourly':
+              'temperature_2m,precipitation_probability,weather_code,wind_gusts_10m',
+          'timezone': 'auto',
           'forecast_days': '14',
-        });
-        final response = await http.get(url);
-        if (response.statusCode == 200) {
-          return json.decode(response.body);
-        } else {
-          throw Exception('Failed to load daily weather data');
-        }
-      },
+        }),
+        failure: 'Failed to load hourly weather data',
+      ),
     );
-    return Map<String, dynamic>.from(result);
+    return Map<String, dynamic>.from(raw);
+  }
+
+  Future<Map<String, dynamic>> _fetchDaily(double lat, double lon) async {
+    final key = 'weather_daily_${lat}_$lon';
+    final raw = await _cache.getOrFetch(
+      key: key,
+      expiresAt: CacheExpiration.alignedNext(360, 5),
+      fetch: () => _getJson(
+        Uri.https(_host, '/v1/forecast', {
+          'latitude': lat.toString(),
+          'longitude': lon.toString(),
+          'daily':
+              'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum',
+          'timezone': 'auto',
+          'forecast_days': '14',
+        }),
+        failure: 'Failed to load daily weather data',
+      ),
+    );
+    return Map<String, dynamic>.from(raw);
   }
 
   Future<Map<String, dynamic>> _fetchAirQuality(double lat, double lon) async {
-    final cacheKey = 'weather_air_quality_${lat}_$lon';
-    final result = await _getCachedOrFetch(
-      cacheKey: cacheKey,
-      expirationTime: _calculateNextAlignedExpiration(60, 5),
-      fetchFunction: () async {
-        final url = Uri.https('air-quality-api.open-meteo.com', '/v1/air-quality', {
-          'latitude': lat.toString(),
-          'longitude': lon.toString(),
-          'current': 'european_aqi,pm2_5,ozone',
-          'timezone': 'UTC',
-        });
-        final response = await http.get(url);
-        if (response.statusCode == 200) {
-          return json.decode(response.body);
-        } else {
-          return null; // Don't fail the whole app for AQI
+    final key = 'weather_air_quality_${lat}_$lon';
+    final raw = await _cache.getOrFetch(
+      key: key,
+      expiresAt: CacheExpiration.alignedNext(60, 5),
+      // Air quality is non-essential: tolerate failures by returning {} so the
+      // rest of the dashboard still loads.
+      fetch: () async {
+        try {
+          return await _getJson(
+            Uri.https(_airQualityHost, '/v1/air-quality', {
+              'latitude': lat.toString(),
+              'longitude': lon.toString(),
+              'current': 'european_aqi,pm2_5,ozone',
+              'timezone': 'auto',
+            }),
+            failure: 'air quality unavailable',
+          );
+        } catch (_) {
+          return <String, dynamic>{};
         }
       },
     );
-    return result != null ? Map<String, dynamic>.from(result) : {};
+    return raw == null ? <String, dynamic>{} : Map<String, dynamic>.from(raw);
   }
 
-  @override
-  Future<Map<String, dynamic>> fetchWeather({required double lat, required double lon, DateTime? startTime, DateTime? endTime}) async {
-    final results = await Future.wait([
-      _fetchMinutelyWeather(lat, lon, start: startTime, end: endTime),
-      _fetchHourlyWeather(lat, lon), // Get standard hourly range
-      _fetchDailyWeather(lat, lon),
-      _fetchAirQuality(lat, lon),
-    ]);
-
-    final minutelyResult = results[0];
-    final hourlyResult = results[1];
-    final dailyResult = results[2];
-    final airQualityResult = results[3];
-
-    final combinedData = {
-      ...minutelyResult,
-      'hourly': hourlyResult['hourly'],
-      'daily': dailyResult['daily'],
-      'utc_offset_seconds': minutelyResult['utc_offset_seconds'],
-      'timezone': minutelyResult['timezone'],
-      'air_quality': airQualityResult['current'],
-    };
-
-    final alert = _analyzeAlerts(combinedData);
-    if (alert != null) {
-      combinedData['alert'] = alert;
+  Future<dynamic> _getJson(Uri uri, {required String failure}) async {
+    final response = await _http.get(uri);
+    if (response.statusCode != 200) {
+      throw Exception('$failure (${response.statusCode})');
     }
-
-    return combinedData;
-  }
-
-  Map<String, String>? _analyzeAlerts(Map<String, dynamic> data) {
-    if (data['current'] == null) return null;
-
-    final current = data['current'];
-    final weatherCode = current['weather_code'];
-    final windGust = current['wind_gusts_10m'] ?? 0;
-    
-    if (weatherCode == 95 || weatherCode == 96 || weatherCode == 99) {
-      return {
-        'title': 'Thunderstorm Warning',
-        'message': 'Thunderstorms with possible hail detected in your area.',
-        'type': 'thunder',
-      };
-    }
-
-    if (windGust > 70) {
-      return {
-        'title': 'High Wind Warning',
-        'message': 'Dangerous wind gusts of ${windGust.round()} km/h detected.',
-        'type': 'wind',
-      };
-    }
-
-    final minutely = data['minutely_15'];
-    if (minutely != null && minutely['precipitation'] != null) {
-      final precipList = List<num>.from(minutely['precipitation']);
-      for (int i = 0; i < 4 && i < precipList.length; i++) {
-        if (precipList[i] > 2.5) {
-          return {
-            'title': 'Heavy Rain Alert',
-            'message': 'Very heavy rainfall expected within the hour.',
-            'type': 'rain',
-          };
-        }
-      }
-    }
-
-    if (weatherCode == 75) {
-      return {
-        'title': 'Heavy Snow Alert',
-        'message': 'Significant snow accumulation expected.',
-        'type': 'snow',
-      };
-    }
-
-    return null;
+    return json.decode(response.body);
   }
 }

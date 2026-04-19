@@ -26,11 +26,20 @@ class RadarMap extends StatefulWidget {
 class _RadarMapState extends State<RadarMap> {
   final MapController _mapController = MapController();
 
+  static const double _initialZoom = 7.0;
+
   @override
   void didUpdateWidget(RadarMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.lat != oldWidget.lat || widget.lon != oldWidget.lon) {
-      _mapController.move(LatLng(widget.lat, widget.lon), _mapController.camera.zoom);
+      // Reading [MapController.camera] before [FlutterMap] has rendered once
+      // throws (see flutter_map MapControllerImpl). Location can update on the
+      // first dashboard frame while the map is still attaching — defer the move.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final zoom = _mapController.camera.zoom;
+        _mapController.move(LatLng(widget.lat, widget.lon), zoom);
+      });
     }
   }
 
@@ -57,7 +66,7 @@ class _RadarMapState extends State<RadarMap> {
         mapController: _mapController,
         options: MapOptions(
           initialCenter: center,
-          initialZoom: 7.0,
+          initialZoom: _initialZoom,
           interactionOptions: const InteractionOptions(
             flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
           ),
@@ -76,9 +85,16 @@ class _RadarMapState extends State<RadarMap> {
               return Opacity(
                 opacity: 0.8,
                 child: TileLayer(
-                  key: ValueKey(frame.path),
+                  key: ValueKey(frame.frameId),
                   urlTemplate: config.urlTemplate,
                   wmsOptions: config.wmsOptions,
+                  // Only fetch tiles strictly inside the viewport. KNMI WMS has a
+                  // tight quota and each animation frame would otherwise also
+                  // request the surrounding panBuffer/keepBuffer rings. Cached
+                  // bytes in KnmiRasterTileCache make re-mounting on small pans
+                  // free, so dropping the buffers does not cost network.
+                  panBuffer: 0,
+                  keepBuffer: 0,
                   tileProvider: config.apiClient != null
                       ? KnmiTileProvider(
                           apiClient: config.apiClient!,

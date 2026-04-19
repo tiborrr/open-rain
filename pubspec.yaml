@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_dotenv: ^6.0.0
-  flutter_map: ^8.2.2
+  flutter_map: ^8.3.0
   geocoding: ^4.0.0
   geolocator: ^14.0.2
   http: ^1.6.0
@@ -20,6 +20,7 @@ dependencies:
   provider: ^6.1.2
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
+  xml: ^6.6.1
 
 dev_dependencies:
   flutter_test:

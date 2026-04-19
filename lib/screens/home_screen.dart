@@ -1,24 +1,30 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
+
+import '../constants/knmi_radar_constants.dart';
 import '../controllers/radar_controller.dart';
 import '../providers/radar_provider.dart';
-import '../services/open_meteo_service.dart';
-import '../services/knmi_service.dart';
-import '../repositories/weather_repository.dart';
-import '../repositories/radar_repository.dart';
+import '../utils/knmi_raster_tile_cache.dart';
+import '../utils/throttled_tile_provider.dart';
 import '../view_models/home_view_model.dart';
-import 'package:provider/provider.dart';
-import '../widgets/radar_map.dart';
-import '../widgets/precipitation_chart.dart';
-import '../widgets/current_conditions_card.dart';
-import '../widgets/forecast_widgets.dart';
-import '../widgets/severe_alert_card.dart';
-import '../widgets/location_search_overlay.dart';
 import '../widgets/air_quality_card.dart';
 import '../widgets/attribution_footer.dart';
-import '../services/location_service.dart';
+import '../widgets/current_conditions_card.dart';
+import '../widgets/forecast_widgets.dart';
+import '../widgets/location_search_overlay.dart';
+import '../widgets/precipitation_chart.dart';
+import '../widgets/radar_map.dart';
+import '../widgets/severe_alert_card.dart';
 
+/// Dashboard screen.
+///
+/// All dependencies are read from the surrounding `Provider` (composed in
+/// `main.dart`). The screen owns short-lived UI state only:
+///   * a [RadarController] driving the radar animation
+///   * a polling [Timer] for background reloads
+///   * a listener that prints command errors as a `SnackBar`
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -27,88 +33,111 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  late final HomeViewModel _viewModel;
   final RadarController _radarController = RadarController();
-  final RadarProvider _radarProvider = KNMIService(
-    wmsApiKey: dotenv.env['KNMI_WMS_API_KEY'],
-  );
   Timer? _pollingTimer;
+  HomeViewModel? _viewModel;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Dependency Injection (Simplified)
-    final weatherProvider = OpenMeteoService();
-    final weatherRepository = WeatherRepository(weatherProvider);
-    final radarRepository = RadarRepository(_radarProvider);
-    final locationService = LocationService();
-
-    _viewModel = HomeViewModel(
-      weatherRepository: weatherRepository,
-      radarRepository: radarRepository,
-      locationService: locationService,
+    final vm = context.read<HomeViewModel>();
+    _viewModel = vm;
+    vm.loadDashboard.addListener(_onLoadDashboardChanged);
+    vm.loadDashboard.execute(null);
+    _pollingTimer = Timer.periodic(
+      KnmiRadarConstants.dashboardBackgroundPollInterval,
+      (_) => vm.loadDashboard.execute(null),
     );
-
-    _loadData();
-    _pollingTimer = Timer.periodic(const Duration(minutes: 5), (_) => _loadData());
-
-    _viewModel.addListener(() {
-       if (_viewModel.status == HomeStatus.success) {
-         _radarController.setFrames(_viewModel.radarFrames);
-         if (!_radarController.isPlaying) {
-           _radarController.play();
-         }
-       }
-    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pollingTimer?.cancel();
+    _viewModel?.loadDashboard.removeListener(_onLoadDashboardChanged);
     _radarController.dispose();
-    _viewModel.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadData();
+      _viewModel?.loadDashboard.execute(null);
     }
   }
 
-  void _loadData() {
-    _viewModel.loadDashboard();
+  /// Hook the dashboard load completion so the radar animation latches onto
+  /// freshly discovered frames and so transient errors surface as a snackbar.
+  void _onLoadDashboardChanged() {
+    final vm = _viewModel;
+    if (vm == null) return;
+
+    if (vm.loadDashboard.completed && vm.radarFrames.isNotEmpty) {
+      _radarController.setFrames(
+        vm.radarFrames,
+        initialTime: DateTime.now().toUtc(),
+      );
+      if (!_radarController.isPlaying) _radarController.play();
+    }
+
+    if (vm.loadDashboard.error) {
+      final err = vm.loadDashboard.errorObject;
+      vm.loadDashboard.clearResult();
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      messenger?.showSnackBar(
+        SnackBar(content: Text('Failed to load: $err')),
+      );
+    }
+  }
+
+  /// User-initiated refresh: also bust the KNMI tile bytes cache so the next
+  /// frame mount re-decodes fresh imagery instead of serving cached tiles.
+  void _refreshFromUser() {
+    KnmiRasterTileCache.instance.clear();
+    KnmiTileProvider.bumpImageCacheGeneration();
+    context.read<HomeViewModel>().loadDashboard.execute(null);
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<HomeViewModel>();
+    final radarProvider = context.read<RadarProvider>();
+
     return Scaffold(
       body: ListenableBuilder(
-        listenable: _viewModel,
+        listenable: vm.loadDashboard,
         builder: (context, _) {
-          switch (_viewModel.status) {
-            case HomeStatus.initial:
-              return const Center(child: CircularProgressIndicator());
-            case HomeStatus.loading:
-              if (_viewModel.weatherData != null) return _buildDashboard(context);
-              return const Center(child: CircularProgressIndicator());
-            case HomeStatus.error:
-              if (_viewModel.weatherData != null) return _buildDashboard(context);
-              return Center(child: Text('Error: ${_viewModel.errorMessage}'));
-            case HomeStatus.success:
-              return _buildDashboard(context);
+          if (vm.isInitialLoading) {
+            return const Center(child: CircularProgressIndicator());
           }
+          final data = vm.weatherData;
+          if (data == null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Text(
+                  'Failed to load weather data: '
+                  '${vm.loadDashboard.errorObject ?? "unknown error"}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+          return _buildDashboard(context, vm, radarProvider);
         },
       ),
     );
   }
 
-  Widget _buildDashboard(BuildContext context) {
-    final weather = _viewModel.weatherData!;
+  Widget _buildDashboard(
+    BuildContext context,
+    HomeViewModel vm,
+    RadarProvider radarProvider,
+  ) {
+    final weather = vm.weatherData!;
+    final loading = vm.loadDashboard.running;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -128,15 +157,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       children: [
                         Flexible(
                           child: Text(
-                            _viewModel.currentLocationName,
+                            vm.currentLocationName,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 28,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 28,
+                                ),
                           ),
                         ),
-                        if (_viewModel.status == HomeStatus.loading) ...[
+                        if (loading) ...[
                           const SizedBox(width: 12),
                           const SizedBox(
                             width: 16,
@@ -151,18 +183,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.refresh, size: 20),
                     ),
-                    onPressed: _loadData,
+                    onPressed: _refreshFromUser,
                   ),
                   IconButton(
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.search, size: 20),
@@ -174,15 +210,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 24),
             RadarMap(
-              lat: _viewModel.weatherData?.current.lat ?? 52.3676,
-              lon: _viewModel.weatherData?.current.lon ?? 4.9041,
+              lat: weather.current.lat,
+              lon: weather.current.lon,
               controller: _radarController,
-              provider: _radarProvider,
+              provider: radarProvider,
             ),
             PrecipitationChart(
               forecast: weather.minutely,
               controller: _radarController,
               localNow: weather.localNow,
+              utcOffset: weather.utcOffset,
             ),
             const SizedBox(height: 32),
             if (weather.alert != null) ...[
@@ -217,6 +254,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _showSearchOverlay(BuildContext context) {
+    final vm = context.read<HomeViewModel>();
     showGeneralDialog(
       context: context,
       barrierColor: Colors.black12,
@@ -225,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) {
         return ChangeNotifierProvider.value(
-          value: _viewModel,
+          value: vm,
           child: const LocationSearchOverlay(),
         );
       },
