@@ -111,6 +111,27 @@ class MinutelyForecast {
       precipitation: (json['precipitation'] as List).map((p) => (p as num).toDouble()).toList(),
     );
   }
+
+  /// Returns the entry of [times] closest to [epochMsUtc] (UTC milliseconds).
+  ///
+  /// Used by the precipitation chart scrubber to snap touch positions onto the
+  /// Open-Meteo 15-minute grid instead of arbitrary axis pixels. Returns `null`
+  /// when [times] is empty. On exact ties, the earlier timestamp wins so the
+  /// behavior is deterministic.
+  DateTime? nearestTimeUtcToMillis(int epochMsUtc) {
+    if (times.isEmpty) return null;
+    DateTime best = times.first;
+    int bestDiff = (best.millisecondsSinceEpoch - epochMsUtc).abs();
+    for (int i = 1; i < times.length; i++) {
+      final t = times[i];
+      final diff = (t.millisecondsSinceEpoch - epochMsUtc).abs();
+      if (diff < bestDiff) {
+        best = t;
+        bestDiff = diff;
+      }
+    }
+    return best;
+  }
 }
 
 class DailyForecast {
