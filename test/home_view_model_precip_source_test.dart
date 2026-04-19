@@ -10,15 +10,13 @@ import 'package:flutter_weather/services/location_service.dart';
 import 'package:flutter_weather/utils/result.dart';
 import 'package:flutter_weather/view_models/home_view_model.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
 
-class MockLocationService extends LocationService {
+class _FixedLocationService extends LocationService {
   @override
-  Future<Position> getCurrentPosition() async => _pos(52.3676, 4.9041);
+  Future<Position> getCurrentPosition() async => _pos(52.0, 5.0);
 
   @override
-  Future<String?> getCityFromCoordinates(double lat, double lon) async =>
-      'Amsterdam';
+  Future<String?> getCityFromCoordinates(double lat, double lon) async => 'Test';
 
   @override
   Stream<Position> getPositionStream() => const Stream.empty();
@@ -37,7 +35,7 @@ class MockLocationService extends LocationService {
       );
 }
 
-class MockWeatherProvider implements WeatherProvider {
+class _OpenMeteoWithMinutely implements WeatherProvider {
   @override
   Future<Result<WeatherData>> fetchWeather({
     required double lat,
@@ -48,35 +46,43 @@ class MockWeatherProvider implements WeatherProvider {
     return Result.ok(
       WeatherData(
         current: CurrentWeather(
-          temperature: 15,
-          humidity: 80,
+          temperature: 10,
+          humidity: 50,
           precipitation: 0,
           weatherCode: 1,
           windGust: 5,
           lat: lat,
           lon: lon,
         ),
-        hourly: HourlyForecast(times: const [], temperatures: const [], weatherCodes: const []),
-        minutely: MinutelyForecast(times: const [], precipitation: const []),
+        hourly: HourlyForecast(
+          times: const [],
+          temperatures: const [],
+          weatherCodes: const [],
+        ),
+        minutely: MinutelyForecast(
+          times: [DateTime.utc(2024, 4, 2, 12), DateTime.utc(2024, 4, 2, 12, 15)],
+          precipitation: const [0.25, 0.5],
+        ),
         daily: DailyForecast(
           times: const [],
           maxTemps: const [],
           minTemps: const [],
           weatherCodes: const [],
         ),
-        utcOffset: const Duration(hours: 1),
-        timezone: 'Europe/Amsterdam',
+        utcOffset: Duration.zero,
+        timezone: 'UTC',
       ),
     );
   }
 }
 
-class MockRadarProvider implements RadarProvider {
-  final List<LatLng> callOrder = [];
-
+class _KnmiStyleRadar implements RadarProvider {
   @override
   Future<Result<List<RadarFrame>>> fetchRadarFrames() async => Result.ok([
-        RadarFrame(frameId: '2024-01-01T00:00:00Z', time: DateTime.now()),
+        RadarFrame(
+          frameId: '2024-04-02T12:00:00Z',
+          time: DateTime.utc(2024, 4, 2, 12),
+        ),
       ]);
 
   @override
@@ -88,46 +94,31 @@ class MockRadarProvider implements RadarProvider {
     required double lat,
     required double lon,
     required List<RadarFrame> frames,
-  }) async {
-    callOrder.add(LatLng(lat, lon));
-    return Result.ok(MinutelyForecast(times: const [], precipitation: const []));
-  }
+  }) async =>
+      Result.ok(
+        MinutelyForecast(
+          times: [DateTime.utc(2024, 4, 2, 12), DateTime.utc(2024, 4, 2, 13)],
+          precipitation: const [99.0, 99.0],
+        ),
+      );
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('HomeViewModel should fetch neighbors by distance (no center KNMI GFI)',
+  test('HomeViewModel keeps Open-Meteo minutely for chart (does not use KNMI GFI)',
       () async {
-    final mockRadarProvider = MockRadarProvider();
-    final radarRepo = RadarRepository(mockRadarProvider);
-    final weatherRepo = WeatherRepository(MockWeatherProvider());
-
-    final viewModel = HomeViewModel(
-      weatherRepository: weatherRepo,
-      radarRepository: radarRepo,
-      locationService: MockLocationService(),
+    final vm = HomeViewModel(
+      weatherRepository: WeatherRepository(_OpenMeteoWithMinutely()),
+      radarRepository: RadarRepository(_KnmiStyleRadar()),
+      locationService: _FixedLocationService(),
     );
 
-    await viewModel.loadDashboard.execute(
-      const LocationSelection(lat: 52.3676, lon: 4.9041, name: 'Amsterdam'),
+    await vm.loadDashboard.execute(
+      const LocationSelection(lat: 52.0, lon: 5.0, name: 'Test'),
     );
 
-    // Background neighbor fetch fires-and-forgets after the command completes.
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-
-    final calls = mockRadarProvider.callOrder;
-    expect(calls.length, 8);
-
-    for (var i = 0; i < calls.length - 1; i++) {
-      final distCurrent = Geolocator.distanceBetween(
-          52.3676, 4.9041, calls[i].latitude, calls[i].longitude);
-      final distNext = Geolocator.distanceBetween(
-          52.3676, 4.9041, calls[i + 1].latitude, calls[i + 1].longitude);
-      expect(distCurrent <= distNext, isTrue,
-          reason: 'Call at index $i is further than call at index ${i + 1}');
-    }
-
-    expect(viewModel.weatherData?.neighbors.length, 8);
+    expect(vm.weatherData, isNotNull);
+    expect(vm.weatherData!.minutely.precipitation, [0.25, 0.5]);
   });
 }

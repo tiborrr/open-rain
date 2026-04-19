@@ -1,13 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_weather/models/weather_models.dart';
+import 'package:flutter_weather/repositories/radar_repository.dart';
+import 'package:flutter_weather/repositories/weather_repository.dart';
+import 'package:flutter_weather/services/location_service.dart';
 import 'package:flutter_weather/services/open_meteo_service.dart';
 import 'package:flutter_weather/services/rainviewer_service.dart';
-import 'package:flutter_weather/repositories/weather_repository.dart';
-import 'package:flutter_weather/repositories/radar_repository.dart';
+import 'package:flutter_weather/utils/result.dart';
 import 'package:flutter_weather/view_models/home_view_model.dart';
-import 'package:flutter_weather/models/weather_models.dart';
-import 'package:flutter_weather/services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockLocationService extends LocationService {
   @override
@@ -30,10 +31,12 @@ class MockLocationService extends LocationService {
   Future<String?> getCityFromCoordinates(double lat, double lon) async {
     return 'Amsterdam';
   }
+
+  @override
+  Stream<Position> getPositionStream() => const Stream.empty();
 }
 
 void main() {
-  // Required for platform channels (SharedPreferences, geolocator) in tests.
   setUpAll(() => TestWidgetsFlutterBinding.ensureInitialized());
 
   group('MVVM Architecture Integration Tests', () {
@@ -43,11 +46,8 @@ void main() {
 
     setUp(() {
       SharedPreferences.setMockInitialValues({});
-      final weatherProvider = OpenMeteoService();
-      final radarProvider = RainViewerService();
-
-      weatherRepository = WeatherRepository(weatherProvider);
-      radarRepository = RadarRepository(radarProvider);
+      weatherRepository = WeatherRepository(OpenMeteoService());
+      radarRepository = RadarRepository(RainViewerService());
 
       viewModel = HomeViewModel(
         weatherRepository: weatherRepository,
@@ -57,30 +57,46 @@ void main() {
     });
 
     test('WeatherRepository should return typed WeatherData', () async {
-      final weatherData = await weatherRepository.getWeatherData(lat: 52.3676, lon: 4.9041);
+      final result = await weatherRepository.getWeatherData(
+        lat: 52.3676,
+        lon: 4.9041,
+      );
 
-      expect(weatherData, isA<WeatherData>());
-      expect(weatherData.current.temperature, isA<double>());
-      expect(weatherData.hourly.times, isNotEmpty);
-      expect(weatherData.minutely.precipitation, isNotEmpty);
+      expect(result, isA<Ok<WeatherData>>());
+      final data = (result as Ok<WeatherData>).value;
+      expect(data.current.temperature, isA<double>());
+      expect(data.hourly.times, isNotEmpty);
+      expect(data.minutely.precipitation, isNotEmpty);
     });
 
-    test('HomeViewModel should manage dashboard state correctly', () async {
-      expect(viewModel.status, HomeStatus.initial);
+    test('HomeViewModel should manage dashboard state via the load command',
+        () async {
+      expect(viewModel.loadDashboard.running, isFalse);
+      expect(viewModel.loadDashboard.completed, isFalse);
 
-      final future = viewModel.loadDashboard();
-      expect(viewModel.status, HomeStatus.loading);
+      final future = viewModel.loadDashboard.execute(
+        const LocationSelection(
+          lat: 52.3676,
+          lon: 4.9041,
+          name: 'Amsterdam',
+        ),
+      );
+      expect(viewModel.loadDashboard.running, isTrue);
 
       await future;
 
-      expect(viewModel.status, HomeStatus.success);
+      expect(viewModel.loadDashboard.running, isFalse);
+      expect(viewModel.loadDashboard.completed, isTrue);
       expect(viewModel.weatherData, isNotNull);
       expect(viewModel.radarFrames, isNotEmpty);
     });
 
-    test('WeatherRepository should detect alerts', () async {
-      final weatherData = await weatherRepository.getWeatherData(lat: 52.3676, lon: 4.9041);
-      expect(weatherData, isA<WeatherData>());
+    test('WeatherRepository should detect alerts (smoke test)', () async {
+      final result = await weatherRepository.getWeatherData(
+        lat: 52.3676,
+        lon: 4.9041,
+      );
+      expect(result, isA<Ok<WeatherData>>());
     });
   });
 }
