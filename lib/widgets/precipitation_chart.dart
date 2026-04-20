@@ -179,12 +179,20 @@ class PrecipitationChart extends StatelessWidget {
                         sideTitles: SideTitles(
                           showTitles: true,
                           interval: titleIntervalMs,
+                          // Skip the bookend ticks at min/max so the edge
+                          // labels don't collide with the first/last
+                          // interval label on narrow time spans.
+                          minIncluded: false,
+                          maxIncluded: false,
                           getTitlesWidget: (value, meta) {
-                            // Convert UTC x-axis value to location local time
                             final time = DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).add(utcOffset);
-                            return Text(
-                              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),
+                            return SideTitleWidget(
+                              meta: meta,
+                              space: 6,
+                              child: Text(
+                                '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),
+                              ),
                             );
                           },
                         ),
