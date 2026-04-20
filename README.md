@@ -1,14 +1,17 @@
 # Open Rain — Flutter Weather App
 
-> [!NOTE]
-> This project was an experiment to see what **Google Stitch** and **Antigravity** can do. It was built entirely through pair-programming with AI to explore the current limits of agentic coding and automated UI design.
+**Version:** 1.5.0 (see `pubspec.yaml` for the full `version` + build number).
 
-A Flutter weather app focused on precipitation, featuring an animated radar map and minute-by-minute nowcasting.
+> [!NOTE]
+> This project began as an experiment with **Google Stitch** and **Antigravity**. It is now developed in **[Cursor](https://cursor.com/)**, primarily through pair-programming with **Opus 4.7**, to keep exploring agentic coding and automated UI design.
+
+A Flutter weather app focused on precipitation, featuring an animated radar map and minute-by-minute nowcasting. The web build uses the **Open Rain** document title; iOS, Android, macOS, and web are supported targets.
 
 ## Features
 
 - **Live radar map** with animated WMS tiles from KNMI (Netherlands Royal Meteorological Institute)
 - **Minute-by-minute precipitation chart** synced to the radar playhead
+- **Rain alerts** — uses Open-Meteo minutely precipitation to warn when rain is expected soon (about 20 minutes ahead) and for how long. **iOS & Android:** local notifications plus periodic background checks (subject to OS scheduling). **Web:** checks while the tab is active (browsers cannot run reliable background work like mobile).
 - **Current conditions** — temperature, wind, UV index, humidity, feels-like
 - **Hourly & 14-day forecast**
 - **Air quality index** (PM2.5, PM10, ozone, NO₂)
@@ -51,7 +54,7 @@ flutter run
 This app uses data from the following providers, in compliance with their respective licences:
 
 ### Open-Meteo
-Weather forecast and air quality data are provided by **[Open-Meteo.com](https://open-meteo.com/)** under the [Creative Commons Attribution 4.0 International Licence (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+Weather forecast, air quality, and **minutely precipitation** (used for rain-ahead alerts) are provided by **[Open-Meteo.com](https://open-meteo.com/)** under the [Creative Commons Attribution 4.0 International Licence (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
 
 > You are free to share and adapt the data, provided you give appropriate credit and link to the licence.
 
