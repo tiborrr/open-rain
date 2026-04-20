@@ -228,8 +228,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ],
             CurrentConditionsCard(
               current: weather.current,
-              localNow: weather.localNow,
-              timezone: weather.timezone,
             ),
             if (weather.airQuality != null) ...[
               const SizedBox(height: 32),

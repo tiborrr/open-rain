@@ -18,6 +18,7 @@ dependencies:
   http: ^1.6.0
   intl: ^0.20.2
   latlong2: ^0.9.1
+  material_symbols_icons: ^4.2928.1
   permission_handler: ^12.0.1
   provider: ^6.1.2
   shared_preferences: ^2.5.5
