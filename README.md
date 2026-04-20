@@ -3,7 +3,7 @@
 **Version:** 1.5.0 (see `pubspec.yaml` for the full `version` + build number).
 
 > [!NOTE]
-> This project was an experiment to see what **Google Stitch** and **Antigravity** can do. It was built entirely through pair-programming with AI to explore the current limits of agentic coding and automated UI design.
+> This project began as an experiment with **Google Stitch** and **Antigravity**. It is now developed in **[Cursor](https://cursor.com/)**, primarily through pair-programming with **Opus 4.7**, to keep exploring agentic coding and automated UI design.
 
 A Flutter weather app focused on precipitation, featuring an animated radar map and minute-by-minute nowcasting. The web build uses the **Open Rain** document title; iOS, Android, macOS, and web are supported targets.
 
