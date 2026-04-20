@@ -43,9 +43,11 @@ class HomeViewModel extends ChangeNotifier {
     required WeatherRepository weatherRepository,
     required RadarRepository radarRepository,
     required LocationService locationService,
+    Future<void> Function(double lat, double lon)? onLocationResolved,
   })  : _weatherRepository = weatherRepository,
         _radarRepository = radarRepository,
-        _locationService = locationService {
+        _locationService = locationService,
+        _onLocationResolved = onLocationResolved {
     loadDashboard = Command1<void, LocationSelection?>(_loadDashboard);
     searchCities =
         Command1<List<LocationResult>, String>(_searchCities);
@@ -65,6 +67,11 @@ class HomeViewModel extends ChangeNotifier {
   final WeatherRepository _weatherRepository;
   final RadarRepository _radarRepository;
   final LocationService _locationService;
+
+  /// Optional callback fired whenever the dashboard has resolved a
+  /// concrete (lat, lon). The rain notification service subscribes to this
+  /// so the background task always has a recent coordinate to query.
+  final Future<void> Function(double lat, double lon)? _onLocationResolved;
 
   StreamSubscription<Position>? _locationSubscription;
   bool _useGps = true;
@@ -169,6 +176,10 @@ class HomeViewModel extends ChangeNotifier {
     final lat = resolved.lat;
     final lon = resolved.lon;
     _currentLocationName = resolved.name;
+
+    // Let the rain notification service know where we are. We don't await
+    // — a slow SharedPreferences write should not delay dashboard rendering.
+    unawaited(_onLocationResolved?.call(lat, lon) ?? Future<void>.value());
 
     final framesResult = await _radarRepository.getRadarFrames();
     final allFrames = framesResult.valueOrNull ?? const <RadarFrame>[];

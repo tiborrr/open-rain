@@ -10,12 +10,25 @@ import 'screens/home_screen.dart';
 import 'services/knmi_service.dart';
 import 'services/location_service.dart';
 import 'services/open_meteo_service.dart';
+import 'services/rain_notification_service.dart';
 import 'theme.dart';
 import 'view_models/home_view_model.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load();
-  runApp(const MyApp());
+
+  // Rain alerts: initialize eagerly so the background task is scheduled on
+  // first launch and notification permissions are requested as part of the
+  // cold start. Any failure is logged but must not block the UI.
+  final rainNotifications = RainNotificationService();
+  try {
+    await rainNotifications.initialize();
+  } catch (e, st) {
+    debugPrint('Failed to initialize rain notifications: $e\n$st');
+  }
+
+  runApp(MyApp(rainNotifications: rainNotifications));
 }
 
 /// App composition root.
@@ -27,7 +40,9 @@ Future<void> main() async {
 /// the view-model uses `ChangeNotifierProvider` so its `dispose` runs when
 /// the tree is torn down.
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.rainNotifications});
+
+  final RainNotificationService rainNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -46,11 +61,16 @@ class MyApp extends StatelessWidget {
         Provider<WeatherRepository>.value(value: weatherRepository),
         Provider<RadarRepository>.value(value: radarRepository),
         Provider<LocationService>.value(value: locationService),
+        Provider<RainNotificationService>.value(value: rainNotifications),
         ChangeNotifierProvider<HomeViewModel>(
           create: (_) => HomeViewModel(
             weatherRepository: weatherRepository,
             radarRepository: radarRepository,
             locationService: locationService,
+            onLocationResolved: (lat, lon) => rainNotifications.reportLocation(
+              lat: lat,
+              lon: lon,
+            ),
           ),
         ),
       ],

@@ -70,5 +70,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Rain notifications: BGTaskScheduler support. `processing` enables
+	     registerPeriodicTask, `fetch` is the fallback on older iOS versions. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.example.flutter_weather.rainCheck</string>
+	</array>
 </dict>
 </plist>
