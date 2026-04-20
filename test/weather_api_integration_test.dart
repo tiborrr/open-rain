@@ -12,7 +12,8 @@ import 'package:flutter_weather/view_models/home_view_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 /// Flutter's test binding stubs [http.Client] to HTTP 400. These tests exercise
 /// repository + view-model wiring with deterministic JSON instead of the network.
@@ -141,7 +142,8 @@ void main() {
     late HomeViewModel viewModel;
 
     setUp(() {
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
       final httpClient = MockClient(_stubWeatherHttp);
       weatherRepository = WeatherRepository(OpenMeteoService(httpClient: httpClient));
       radarRepository = RadarRepository(RainViewerService(httpClient: httpClient));

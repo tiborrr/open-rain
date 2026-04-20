@@ -1,7 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_weather/main.dart';
+import 'package:flutter_weather/services/rain_notification_service.dart';
 
 void main() {
   setUpAll(() async {
@@ -10,7 +11,9 @@ void main() {
   });
 
   testWidgets('App compiles and renders initial loading state', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(
+      MyApp(rainNotifications: RainNotificationService()),
+    );
     // The app starts in loading/initial state — a progress indicator is shown.
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });

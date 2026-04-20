@@ -1,7 +1,7 @@
 name: flutter_weather
 description: "Open Rain — a Flutter weather app with live KNMI radar, minute-by-minute precipitation nowcasting, and air quality data."
 publish_to: 'none'
-version: 1.4.0+1
+version: 1.5.0+1
 
 environment:
   sdk: ^3.11.3
@@ -11,15 +11,19 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_dotenv: ^6.0.0
+  flutter_local_notifications: ^21.0.0
   flutter_map: ^8.3.0
   geocoding: ^4.0.0
   geolocator: ^14.0.2
   http: ^1.6.0
   intl: ^0.20.2
   latlong2: ^0.9.1
+  permission_handler: ^12.0.1
   provider: ^6.1.2
   shared_preferences: ^2.5.5
+  timezone: ^0.11.0
   url_launcher: ^6.3.2
+  workmanager: ^0.9.0+3
   xml: ^6.6.1
 
 dev_dependencies:
@@ -27,6 +31,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  shared_preferences_platform_interface: ^2.4.2
 
 flutter_launcher_icons:
   android: "ic_launcher"
