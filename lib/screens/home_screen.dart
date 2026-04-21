@@ -92,12 +92,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// User-initiated refresh: also bust the KNMI tile bytes cache so the next
-  /// frame mount re-decodes fresh imagery instead of serving cached tiles.
+  /// User-initiated refresh. Bust the KNMI tile bytes cache so the next
+  /// frame mount re-decodes fresh imagery, and tell the view-model to force
+  /// a radar-provider cache bypass — otherwise a still-within-TTL but
+  /// semantically stale frame list (e.g. after the app sat idle past the
+  /// 30-min nowcast window) would keep being returned.
   void _refreshFromUser() {
     KnmiRasterTileCache.instance.clear();
     KnmiTileProvider.bumpImageCacheGeneration();
-    context.read<HomeViewModel>().loadDashboard.execute(null);
+    context.read<HomeViewModel>().refresh();
   }
 
   @override

@@ -75,7 +75,10 @@ class MockRadarProvider implements RadarProvider {
   final List<LatLng> callOrder = [];
 
   @override
-  Future<Result<List<RadarFrame>>> fetchRadarFrames() async => Result.ok([
+  Future<Result<List<RadarFrame>>> fetchRadarFrames({
+    bool forceRefresh = false,
+  }) async =>
+      Result.ok([
         RadarFrame(frameId: '2024-01-01T00:00:00Z', time: DateTime.now()),
       ]);
 

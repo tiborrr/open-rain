@@ -40,7 +40,10 @@ class PrecipitationChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nowUtc = DateTime.now().toUtc();
-    final nowUtcX = localNow.subtract(utcOffset).millisecondsSinceEpoch.toDouble();
+    final nowUtcX = localNow
+        .subtract(utcOffset)
+        .millisecondsSinceEpoch
+        .toDouble();
 
     final List<FlSpot> spots = [];
     double maxPrecip = 0;
@@ -58,13 +61,20 @@ class PrecipitationChart extends StatelessWidget {
       baseMinX = forecast.times.first.millisecondsSinceEpoch.toDouble();
       baseMaxX = forecast.times.last.millisecondsSinceEpoch.toDouble();
     } else {
-      baseMinX = nowUtc.subtract(_PrecipitationChartLayout.emptyStatePastExtent).millisecondsSinceEpoch.toDouble();
-      baseMaxX = nowUtc.add(_PrecipitationChartLayout.emptyStateFutureExtent).millisecondsSinceEpoch.toDouble();
+      baseMinX = nowUtc
+          .subtract(_PrecipitationChartLayout.emptyStatePastExtent)
+          .millisecondsSinceEpoch
+          .toDouble();
+      baseMaxX = nowUtc
+          .add(_PrecipitationChartLayout.emptyStateFutureExtent)
+          .millisecondsSinceEpoch
+          .toDouble();
     }
 
     final maxY = maxPrecip < _PrecipitationChartLayout.defaultMaxYMm
         ? _PrecipitationChartLayout.defaultMaxYMm
-        : (maxPrecip * _PrecipitationChartLayout.maxYHeadroomFactor).ceilToDouble();
+        : (maxPrecip * _PrecipitationChartLayout.maxYHeadroomFactor)
+              .ceilToDouble();
 
     return Container(
       height: 200,
@@ -79,8 +89,8 @@ class PrecipitationChart extends StatelessWidget {
               Text(
                 'PRECIPITATION',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
               AnimatedBuilder(
                 animation: controller,
@@ -108,65 +118,95 @@ class PrecipitationChart extends StatelessWidget {
 
                 widenTo(nowUtcX);
                 if (controller.currentFrame != null) {
-                  widenTo(controller.currentFrame!.time.millisecondsSinceEpoch.toDouble());
+                  widenTo(
+                    controller.currentFrame!.time.millisecondsSinceEpoch
+                        .toDouble(),
+                  );
                 }
                 for (final s in spots) {
                   widenTo(s.x);
                 }
 
                 final chartSpots = spots.isEmpty
-                    ? <FlSpot>[
-                        FlSpot(minX, 0),
-                        FlSpot(maxX, 0),
-                      ]
+                    ? <FlSpot>[FlSpot(minX, 0), FlSpot(maxX, 0)]
                     : spots;
 
                 final xSpanMs = (maxX - minX).clamp(1.0, double.infinity);
-                final minLabelMs = _PrecipitationChartLayout.bottomAxisMinLabelInterval.inMilliseconds.toDouble();
+                final minLabelMs = _PrecipitationChartLayout
+                    .bottomAxisMinLabelInterval
+                    .inMilliseconds
+                    .toDouble();
                 final titleIntervalMs = math.max(
                   minLabelMs,
-                  (xSpanMs / _PrecipitationChartLayout.bottomAxisTargetSegmentCount).roundToDouble(),
+                  (xSpanMs /
+                          _PrecipitationChartLayout
+                              .bottomAxisTargetSegmentCount)
+                      .roundToDouble(),
                 );
 
                 return LineChart(
                   LineChartData(
                     lineTouchData: LineTouchData(
                       handleBuiltInTouches: true,
-                      touchCallback: (FlTouchEvent event, LineTouchResponse? touchResponse) {
-                        if (event is FlPanUpdateEvent || event is FlPanDownEvent || event is FlTapDownEvent) {
-                          if (touchResponse != null && touchResponse.lineBarSpots != null) {
-                            final xMs = touchResponse.lineBarSpots!.first.x.toInt();
-                            // Snap to the nearest Open-Meteo minutely_15 timestamp so the
-                            // scrubber tracks the plotted points instead of arbitrary
-                            // axis pixels. Falls back to the raw touch time when the
-                            // forecast series is empty.
-                            final target = forecast.nearestTimeUtcToMillis(xMs) ??
-                                DateTime.fromMillisecondsSinceEpoch(xMs, isUtc: true);
-                            controller.seekTo(target);
-                          }
-                        }
-                      },
+                      touchCallback:
+                          (
+                            FlTouchEvent event,
+                            LineTouchResponse? touchResponse,
+                          ) {
+                            if (event is FlPanUpdateEvent ||
+                                event is FlPanDownEvent ||
+                                event is FlTapDownEvent) {
+                              if (touchResponse != null &&
+                                  touchResponse.lineBarSpots != null) {
+                                final xMs = touchResponse.lineBarSpots!.first.x
+                                    .toInt();
+                                // Snap to the nearest Open-Meteo minutely_15 timestamp so the
+                                // scrubber tracks the plotted points instead of arbitrary
+                                // axis pixels. Falls back to the raw touch time when the
+                                // forecast series is empty.
+                                final target =
+                                    forecast.nearestTimeUtcToMillis(xMs) ??
+                                    DateTime.fromMillisecondsSinceEpoch(
+                                      xMs,
+                                      isUtc: true,
+                                    );
+                                controller.seekTo(target);
+                              }
+                            }
+                          },
                     ),
                     extraLinesData: ExtraLinesData(
                       verticalLines: [
                         VerticalLine(
-                          x: localNow.subtract(utcOffset).millisecondsSinceEpoch.toDouble(),
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                          x: localNow
+                              .subtract(utcOffset)
+                              .millisecondsSinceEpoch
+                              .toDouble(),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.7),
                           strokeWidth: 1.5,
                           label: VerticalLineLabel(
                             show: true,
                             alignment: Alignment.topRight,
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 9,
-                            ),
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 9,
+                                ),
                             labelResolver: (line) => 'NOW',
                           ),
                         ),
                         if (controller.currentFrame != null)
                           VerticalLine(
-                            x: controller.currentFrame!.time.millisecondsSinceEpoch.toDouble(),
+                            x: controller
+                                .currentFrame!
+                                .time
+                                .millisecondsSinceEpoch
+                                .toDouble(),
                             color: Theme.of(context).colorScheme.onSurface,
                             strokeWidth: 2,
                             dashArray: [5, 5],
@@ -185,13 +225,18 @@ class PrecipitationChart extends StatelessWidget {
                           minIncluded: false,
                           maxIncluded: false,
                           getTitlesWidget: (value, meta) {
-                            final time = DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true).add(utcOffset);
+                            final time = DateTime.fromMillisecondsSinceEpoch(
+                              value.toInt(),
+                              isUtc: true,
+                            ).add(utcOffset);
                             return SideTitleWidget(
                               meta: meta,
                               space: 6,
                               child: Text(
                                 '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.labelSmall?.copyWith(fontSize: 10),
                               ),
                             );
                           },
@@ -202,19 +247,27 @@ class PrecipitationChart extends StatelessWidget {
                           showTitles: true,
                           interval: maxY > 10
                               ? (maxY / 4).ceilToDouble()
-                              : (maxY <= _PrecipitationChartLayout.defaultMaxYMm ? 1 : 2),
+                              : (maxY <= _PrecipitationChartLayout.defaultMaxYMm
+                                    ? 1
+                                    : 2),
                           getTitlesWidget: (value, meta) {
                             if (value == 0) return const SizedBox.shrink();
                             return Text(
                               '${value.toStringAsFixed(0)} mm',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.labelSmall?.copyWith(fontSize: 10),
                             );
                           },
                           reservedSize: 32,
                         ),
                       ),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                     ),
                     borderData: FlBorderData(show: false),
                     minX: minX,
@@ -225,20 +278,13 @@ class PrecipitationChart extends StatelessWidget {
                       LineChartBarData(
                         spots: chartSpots,
                         isCurved: true,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Colors.blue,
                         barWidth: 3,
                         isStrokeCapRound: true,
                         dotData: const FlDotData(show: false),
                         belowBarData: BarAreaData(
                           show: true,
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.0),
-                            ],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                          ),
+                          color: Colors.blue.withValues(alpha: 0.4),
                         ),
                       ),
                     ],

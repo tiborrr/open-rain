@@ -56,13 +56,18 @@ class CacheStore {
   /// Read [key] if fresh, otherwise call [fetch], cache the non-null result,
   /// and return it. On [fetch] failure with a stale cached value, return the
   /// stale value instead of throwing.
+  ///
+  /// Pass [forceRefresh]=true to skip the fresh-cache shortcut and always go
+  /// to [fetch]. The stale-on-error fallback still applies so a forced
+  /// refresh that fails will not erase existing data.
   Future<dynamic> getOrFetch({
     required String key,
     required Future<dynamic> Function() fetch,
     required DateTime expiresAt,
+    bool forceRefresh = false,
   }) async {
     final entry = await _readEntry(key);
-    if (entry != null && entry.isFresh) return entry.data;
+    if (!forceRefresh && entry != null && entry.isFresh) return entry.data;
 
     try {
       final value = await fetch();
@@ -73,6 +78,11 @@ class CacheStore {
       rethrow;
     }
   }
+
+  /// Drop the entry at [key]. Used when a caller decides the cached payload
+  /// is semantically stale (e.g. radar frames older than their usable
+  /// window) even though the expiration has not yet elapsed.
+  Future<void> invalidate(String key) => _prefs.remove(key);
 
   Future<_CacheEntry?> _readEntry(String key) async {
     final raw = await _prefs.getString(key);

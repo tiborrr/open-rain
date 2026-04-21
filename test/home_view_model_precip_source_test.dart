@@ -78,7 +78,10 @@ class _OpenMeteoWithMinutely implements WeatherProvider {
 
 class _KnmiStyleRadar implements RadarProvider {
   @override
-  Future<Result<List<RadarFrame>>> fetchRadarFrames() async => Result.ok([
+  Future<Result<List<RadarFrame>>> fetchRadarFrames({
+    bool forceRefresh = false,
+  }) async =>
+      Result.ok([
         RadarFrame(
           frameId: '2024-04-02T12:00:00Z',
           time: DateTime.utc(2024, 4, 2, 12),

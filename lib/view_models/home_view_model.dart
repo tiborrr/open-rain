@@ -77,6 +77,11 @@ class HomeViewModel extends ChangeNotifier {
   bool _useGps = true;
   Position? _lastUpdatePosition;
 
+  /// Set by [refresh] so the *next* dashboard load bypasses the radar cache.
+  /// Consumed (and cleared) inside [_loadDashboard] to avoid sticky forced
+  /// refreshes on subsequent background polls.
+  bool _forceRadarRefresh = false;
+
   WeatherData? _weatherData;
   List<RadarFrame> _radarFrames = const [];
   String _currentLocationName = 'Unknown Location';
@@ -120,6 +125,16 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> resetToGps() {
     _useGps = true;
     return loadDashboard.execute(null);
+  }
+
+  /// User-initiated refresh. Forces the radar provider to bypass its on-disk
+  /// cache so stale frames (e.g. a cached timeline whose newest frame has
+  /// already aged out of the KNMI nowcast window) get replaced instead of
+  /// re-served. Location and selection semantics are preserved: if the user
+  /// pinned a manual location, we refresh *that* location.
+  Future<void> refresh({LocationSelection? selection}) {
+    _forceRadarRefresh = true;
+    return loadDashboard.execute(selection);
   }
 
   // ---------------------------------------------------------------------------
@@ -181,7 +196,11 @@ class HomeViewModel extends ChangeNotifier {
     // — a slow SharedPreferences write should not delay dashboard rendering.
     unawaited(_onLocationResolved?.call(lat, lon) ?? Future<void>.value());
 
-    final framesResult = await _radarRepository.getRadarFrames();
+    final forceRadar = _forceRadarRefresh;
+    _forceRadarRefresh = false;
+    final framesResult = await _radarRepository.getRadarFrames(
+      forceRefresh: forceRadar,
+    );
     final allFrames = framesResult.valueOrNull ?? const <RadarFrame>[];
     if (framesResult is Err<List<RadarFrame>>) {
       debugPrint('Failed to get radar frames: ${framesResult.error}');

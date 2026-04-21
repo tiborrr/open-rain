@@ -63,10 +63,21 @@ class KNMIService implements RadarProvider {
   // Frame discovery
   // ---------------------------------------------------------------------------
 
+  static const String _capabilitiesCacheKey = 'knmi_wms_capabilities_times';
+
   @override
-  Future<Result<List<RadarFrame>>> fetchRadarFrames() async {
+  Future<Result<List<RadarFrame>>> fetchRadarFrames({
+    bool forceRefresh = false,
+  }) async {
     try {
-      final times = await _discoverAvailableTimes();
+      var times = await _discoverAvailableTimes(forceRefresh: forceRefresh);
+      if (_isTimesStale(times)) {
+        // Cached entry still within its wall-clock TTL but its newest frame
+        // is already outside the usable window — the KNMI tile server will
+        // 404 on those TIME values. Nuke the cache and retry once.
+        await _cache.invalidate(_capabilitiesCacheKey);
+        times = await _discoverAvailableTimes(forceRefresh: true);
+      }
       if (times.isNotEmpty) {
         return Result.ok([
           for (final t in times) RadarFrame(frameId: _formatTime(t), time: t),
@@ -77,6 +88,13 @@ class KNMIService implements RadarProvider {
     }
 
     return Result.ok(_fallbackFrames());
+  }
+
+  bool _isTimesStale(List<DateTime> times) {
+    if (times.isEmpty) return false;
+    final newest = times.reduce((a, b) => a.isAfter(b) ? a : b);
+    return DateTime.now().toUtc().difference(newest) >
+        RadarFreshness.maxAge;
   }
 
   List<RadarFrame> _fallbackFrames() {
@@ -99,9 +117,12 @@ class KNMIService implements RadarProvider {
     ];
   }
 
-  Future<List<DateTime>> _discoverAvailableTimes() async {
+  Future<List<DateTime>> _discoverAvailableTimes({
+    bool forceRefresh = false,
+  }) async {
     final raw = await _cache.getOrFetch(
-      key: 'knmi_wms_capabilities_times',
+      key: _capabilitiesCacheKey,
+      forceRefresh: forceRefresh,
       expiresAt: CacheExpiration.alignedNext(
         KnmiRadarConstants.cacheExpirationIntervalMinutes,
         KnmiRadarConstants.cacheExpirationDelayMinutes,

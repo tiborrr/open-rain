@@ -11,6 +11,11 @@ import '../utils/result.dart';
 
 /// RainViewer radar provider. Returns past + nowcast frames from a single
 /// `weather-maps.json` index, cached on the 10-minute publish boundary.
+///
+/// On each read we also apply [RadarFreshness.isStale] to the decoded
+/// payload. A cache entry can still be within its wall-clock TTL while its
+/// newest frame already aged out — in that case we invalidate and refetch
+/// so the tile template we hand the map does not 404.
 class RainViewerService implements RadarProvider {
   RainViewerService({CacheStore? cacheStore, http.Client? httpClient})
       : _cache = cacheStore ?? CacheStore(),
@@ -18,45 +23,63 @@ class RainViewerService implements RadarProvider {
 
   static const String _indexUrl =
       'https://api.rainviewer.com/public/weather-maps.json';
+  static const String _framesCacheKey = 'radar_timestamps_v2';
 
   final CacheStore _cache;
   final http.Client _http;
 
   @override
-  Future<Result<List<RadarFrame>>> fetchRadarFrames() async {
+  Future<Result<List<RadarFrame>>> fetchRadarFrames({
+    bool forceRefresh = false,
+  }) async {
     try {
-      final raw = await _cache.getOrFetch(
-        key: 'radar_timestamps_v2',
-        expiresAt: CacheExpiration.alignedNext(10, 2),
-        fetch: () async {
-          final response = await _http.get(Uri.parse(_indexUrl));
-          if (response.statusCode != 200) return null;
-          final data = json.decode(response.body);
-          final past = (data['radar']['past'] as List?) ?? const [];
-          final nowcast = (data['radar']['nowcast'] as List?) ?? const [];
-          final frames = <Map<String, dynamic>>[
-            for (final item in [...past, ...nowcast])
-              {
-                'frameId': item['path'],
-                'time': DateTime.fromMillisecondsSinceEpoch(
-                        (item['time'] as num).toInt() * 1000)
-                    .toIso8601String(),
-              },
-          ];
-          return frames.isEmpty ? null : frames;
-        },
+      var frames = _decodeFrames(
+        await _fetchFramesRaw(forceRefresh: forceRefresh),
       );
-
-      if (raw is! List) return const Result.ok([]);
-
-      return Result.ok([
-        for (final e in raw) RadarFrame.fromJson(Map<String, dynamic>.from(e)),
-      ]);
+      if (RadarFreshness.isStale(frames, DateTime.now().toUtc())) {
+        await _cache.invalidate(_framesCacheKey);
+        frames = _decodeFrames(
+          await _fetchFramesRaw(forceRefresh: true),
+        );
+      }
+      return Result.ok(frames);
     } on Exception catch (e) {
       return Result.err(e);
     } catch (e) {
       return Result.err(Exception(e.toString()));
     }
+  }
+
+  Future<dynamic> _fetchFramesRaw({required bool forceRefresh}) {
+    return _cache.getOrFetch(
+      key: _framesCacheKey,
+      forceRefresh: forceRefresh,
+      expiresAt: CacheExpiration.alignedNext(10, 2),
+      fetch: () async {
+        final response = await _http.get(Uri.parse(_indexUrl));
+        if (response.statusCode != 200) return null;
+        final data = json.decode(response.body);
+        final past = (data['radar']['past'] as List?) ?? const [];
+        final nowcast = (data['radar']['nowcast'] as List?) ?? const [];
+        final frames = <Map<String, dynamic>>[
+          for (final item in [...past, ...nowcast])
+            {
+              'frameId': item['path'],
+              'time': DateTime.fromMillisecondsSinceEpoch(
+                      (item['time'] as num).toInt() * 1000)
+                  .toIso8601String(),
+            },
+        ];
+        return frames.isEmpty ? null : frames;
+      },
+    );
+  }
+
+  List<RadarFrame> _decodeFrames(dynamic raw) {
+    if (raw is! List) return const [];
+    return [
+      for (final e in raw) RadarFrame.fromJson(Map<String, dynamic>.from(e)),
+    ];
   }
 
   @override

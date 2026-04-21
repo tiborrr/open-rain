@@ -14,8 +14,10 @@ class RadarRepository {
 
   final RadarProvider _provider;
 
-  Future<Result<List<RadarFrame>>> getRadarFrames() =>
-      _provider.fetchRadarFrames();
+  Future<Result<List<RadarFrame>>> getRadarFrames({
+    bool forceRefresh = false,
+  }) =>
+      _provider.fetchRadarFrames(forceRefresh: forceRefresh);
 
   Future<Result<MinutelyForecast?>> getPrecipitationSeries({
     required double lat,
