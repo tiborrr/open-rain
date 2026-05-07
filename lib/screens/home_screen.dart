@@ -188,19 +188,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             .surfaceContainerHighest,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.refresh, size: 20),
-                    ),
-                    onPressed: _refreshFromUser,
-                  ),
-                  IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                        shape: BoxShape.circle,
-                      ),
                       child: const Icon(Icons.search, size: 20),
                     ),
                     onPressed: () => _showSearchOverlay(context),
@@ -209,11 +196,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(height: 24),
-            RadarMap(
-              lat: weather.current.lat,
-              lon: weather.current.lon,
-              controller: _radarController,
-              provider: radarProvider,
+            Stack(
+              children: [
+                RadarMap(
+                  lat: weather.current.lat,
+                  lon: weather.current.lon,
+                  controller: _radarController,
+                  provider: radarProvider,
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _refreshFromUser,
+                      customBorder: const CircleBorder(),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.refresh, size: 20),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             PrecipitationChart(
               forecast: weather.minutely,
