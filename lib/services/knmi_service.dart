@@ -49,14 +49,18 @@ class KNMIService implements RadarProvider {
       wmsApiKey != null ? {'Authorization': wmsApiKey!} : null;
 
   static String? _sanitizeKey(String? key) {
-    if (key == _placeholderKey) {
+    final trimmed = key?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    if (trimmed == _placeholderKey) {
       debugPrint(
         'KNMIService: KNMI_WMS_API_KEY is still set to the example placeholder. '
         'Falling back to anonymous access.',
       );
       return null;
     }
-    return key;
+    return trimmed;
   }
 
   // ---------------------------------------------------------------------------
