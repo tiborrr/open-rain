@@ -176,7 +176,6 @@ class HomeViewModel extends ChangeNotifier {
     final lat = resolved.lat;
     final lon = resolved.lon;
     _currentLocationName = resolved.name;
-
     // Let the rain notification service know where we are. We don't await
     // — a slow SharedPreferences write should not delay dashboard rendering.
     unawaited(_onLocationResolved?.call(lat, lon) ?? Future<void>.value());
@@ -197,7 +196,6 @@ class HomeViewModel extends ChangeNotifier {
       lon: lon,
       endTime: endHint,
     );
-
     return switch (weatherResult) {
       Ok<WeatherData>(value: final data) => () {
           // Align the radar timeline with whatever Open-Meteo actually
@@ -215,7 +213,9 @@ class HomeViewModel extends ChangeNotifier {
           }
           return const Result<void>.ok(null);
         }(),
-      Err<WeatherData>(error: final e) => Result<void>.err(e),
+      Err<WeatherData>(error: final e) => () {
+          return Result<void>.err(e);
+        }(),
     };
   }
 
