@@ -12,7 +12,10 @@ void main() {
 
   testWidgets('App compiles and renders initial loading state', (WidgetTester tester) async {
     await tester.pumpWidget(
-      MyApp(rainNotifications: RainNotificationService()),
+      MyApp(
+        rainNotifications: RainNotificationService(),
+        persistedKnmiApiKey: null,
+      ),
     );
     // The app starts in loading/initial state — a progress indicator is shown.
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
