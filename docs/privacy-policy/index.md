@@ -12,7 +12,7 @@ T Ken C Holding BV, gevestigd aan Langestraat 53, 7419AR, Deventer, Nederland, i
 
 - Website: `https://github.com/tiborrr/open-rain/`
 - Adres: Langestraat 53, 7419AR, Deventer, Nederland
-- Functionaris Gegevensbescherming: Tibor Casteleijn — te bereiken via `tiborcasteleijn@gmail.com`
+- Functionaris Gegevensbescherming: Tibor Casteleijn — te bereiken via `tiborcasteleijn [at] gmail [dot] com`
 
 ### Persoonsgegevens die wij verwerken
 
@@ -34,7 +34,7 @@ Hieronder vind je een overzicht van de persoonsgegevens die wij verwerken:
 
 ### Bijzondere en/of gevoelige persoonsgegevens die wij verwerken
 
-Onze website en/of dienst heeft niet de intentie gegevens te verzamelen over websitebezoekers die jonger zijn dan 16 jaar. Tenzij ze toestemming hebben van ouders of voogd. We kunnen echter niet controleren of een bezoeker ouder dan 16 is. Wij raden ouders dan ook aan betrokken te zijn bij de online activiteiten van hun kinderen, om zo te voorkomen dat er gegevens over kinderen verzameld worden zonder ouderlijke toestemming. Als je er van overtuigd bent dat wij zonder die toestemming persoonlijke gegevens hebben verzameld over een minderjarige, neem dan contact met ons op via `tiborcasteleijn@gmail.com`, dan verwijderen wij deze informatie.
+Onze website en/of dienst heeft niet de intentie gegevens te verzamelen over websitebezoekers die jonger zijn dan 16 jaar. Tenzij ze toestemming hebben van ouders of voogd. We kunnen echter niet controleren of een bezoeker ouder dan 16 is. Wij raden ouders dan ook aan betrokken te zijn bij de online activiteiten van hun kinderen, om zo te voorkomen dat er gegevens over kinderen verzameld worden zonder ouderlijke toestemming. Als je er van overtuigd bent dat wij zonder die toestemming persoonlijke gegevens hebben verzameld over een minderjarige, neem dan contact met ons op via `tiborcasteleijn [at] gmail [dot] com`, dan verwijderen wij deze informatie.
 
 ### Met welk doel en op basis van welke grondslag wij persoonsgegevens verwerken
 
@@ -92,7 +92,7 @@ Hieronder een overzicht van cookies/technieken op deze site:
 
 Je hebt het recht om je persoonsgegevens in te zien, te corrigeren of te verwijderen. Daarnaast heb je het recht om je eventuele toestemming voor de gegevensverwerking in te trekken of bezwaar te maken tegen de verwerking van jouw persoonsgegevens door T Ken C Holding BV en heb je het recht op gegevensoverdraagbaarheid. Dat betekent dat je bij ons een verzoek kan indienen om de persoonsgegevens die wij van jou beschikken in een computerbestand naar jou of een ander, door jou genoemde organisatie, te sturen.
 
-Je kunt een verzoek tot inzage, correctie, verwijdering, gegevensoverdraging van je persoonsgegevens of verzoek tot intrekking van je toestemming of bezwaar op de verwerking van jouw persoonsgegevens sturen naar `tiborcasteleijn@gmail.com`.
+Je kunt een verzoek tot inzage, correctie, verwijdering, gegevensoverdraging van je persoonsgegevens of verzoek tot intrekking van je toestemming of bezwaar op de verwerking van jouw persoonsgegevens sturen naar `tiborcasteleijn [at] gmail [dot] com`.
 
 Om er zeker van te zijn dat het verzoek tot inzage door jou is gedaan, vragen wij jou een kopie van je identiteitsbewijs met het verzoek mee te sturen. Maak in deze kopie je pasfoto, MRZ (machine readable zone, de strook met nummers onderaan het paspoort), paspoortnummer en Burgerservicenummer (BSN) zwart. Dit ter bescherming van je privacy. We reageren zo snel mogelijk, maar binnen vier weken, op jouw verzoek.
 
@@ -100,7 +100,7 @@ T Ken C Holding BV wil je er tevens op wijzen dat je de mogelijkheid hebt om een
 
 ### Hoe wij persoonsgegevens beveiligen
 
-T Ken C Holding BV neemt de bescherming van jouw gegevens serieus en neemt passende maatregelen om misbruik, verlies, onbevoegde toegang, ongewenste openbaarmaking en ongeoorloofde wijziging tegen te gaan. Als jij het idee hebt dat jouw gegevens toch niet goed beveiligd zijn of er aanwijzingen zijn van misbruik, neem dan contact op met onze klantenservice of via `tiborcasteleijn@gmail.com`.
+T Ken C Holding BV neemt de bescherming van jouw gegevens serieus en neemt passende maatregelen om misbruik, verlies, onbevoegde toegang, ongewenste openbaarmaking en ongeoorloofde wijziging tegen te gaan. Als jij het idee hebt dat jouw gegevens toch niet goed beveiligd zijn of er aanwijzingen zijn van misbruik, neem dan contact op met onze klantenservice of via `tiborcasteleijn [at] gmail [dot] com`.
 
 ---
 
@@ -112,7 +112,7 @@ T Ken C Holding BV, located at Langestraat 53, 7419AR, Deventer, the Netherlands
 
 - Website: `https://github.com/tiborrr/open-rain/`
 - Address: Langestraat 53, 7419AR, Deventer, the Netherlands
-- Data Protection Officer: Tibor Casteleijn — reachable via `tiborcasteleijn@gmail.com`
+- Data Protection Officer: Tibor Casteleijn — reachable via `tiborcasteleijn [at] gmail [dot] com`
 
 ### Personal data we process
 
@@ -134,7 +134,7 @@ Below is an overview of the personal data we process:
 
 ### Special and/or sensitive personal data we process
 
-Our website and/or service does not intend to collect data about website visitors who are under 16 years of age, unless they have permission from a parent or guardian. However, we cannot verify whether a visitor is older than 16. We therefore encourage parents to be involved in their children’s online activities to prevent data about children from being collected without parental consent. If you believe that we have collected personal data about a minor without such consent, please contact us at `tiborcasteleijn@gmail.com` and we will delete this information.
+Our website and/or service does not intend to collect data about website visitors who are under 16 years of age, unless they have permission from a parent or guardian. However, we cannot verify whether a visitor is older than 16. We therefore encourage parents to be involved in their children’s online activities to prevent data about children from being collected without parental consent. If you believe that we have collected personal data about a minor without such consent, please contact us at `tiborcasteleijn [at] gmail [dot] com` and we will delete this information.
 
 ### Purposes for which we process personal data
 
@@ -192,7 +192,7 @@ Below is an overview of cookies/techniques on this site:
 
 You have the right to access, correct, or delete your personal data. In addition, you have the right to withdraw your consent for data processing or to object to the processing of your personal data by T Ken C Holding BV, and you have the right to data portability. This means you can submit a request to us to send the personal data we hold about you in a computer file to you or to another organization named by you.
 
-You can send a request for access, correction, deletion, transfer of your personal data, or a request to withdraw your consent or to object to the processing of your personal data to `tiborcasteleijn@gmail.com`.
+You can send a request for access, correction, deletion, transfer of your personal data, or a request to withdraw your consent or to object to the processing of your personal data to `tiborcasteleijn [at] gmail [dot] com`.
 
 To ensure that the request for access was made by you, we ask you to include a copy of your identity document with your request. In this copy, black out your photo, MRZ (machine readable zone, the strip with numbers at the bottom of the passport), passport number, and citizen service number (BSN). This is to protect your privacy. We will respond as quickly as possible, but within four weeks, to your request.
 
@@ -200,7 +200,7 @@ T Ken C Holding BV would also like to point out that you have the option to file
 
 ### How we secure personal data
 
-T Ken C Holding BV takes the protection of your data seriously and takes appropriate measures to prevent misuse, loss, unauthorized access, unwanted disclosure, and unauthorized modification. If you feel that your data is not properly secured or there are indications of misuse, please contact our customer service or contact us via `tiborcasteleijn@gmail.com`.
+T Ken C Holding BV takes the protection of your data seriously and takes appropriate measures to prevent misuse, loss, unauthorized access, unwanted disclosure, and unauthorized modification. If you feel that your data is not properly secured or there are indications of misuse, please contact our customer service or contact us via `tiborcasteleijn [at] gmail [dot] com`.
 
 ---
 
