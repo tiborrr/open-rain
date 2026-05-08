@@ -28,7 +28,7 @@ class KNMIService implements RadarProvider {
     String? wmsApiKey,
     KnmiApiClient? apiClient,
     CacheStore? cacheStore,
-  })  : wmsApiKey = _sanitizeKey(wmsApiKey),
+  })  : _wmsApiKey = _sanitizeKey(wmsApiKey),
         _client = apiClient ?? KnmiApiClient(),
         _cache = cacheStore ?? CacheStore();
 
@@ -38,25 +38,37 @@ class KNMIService implements RadarProvider {
   static const String _anonymousHost =
       'https://anonymous.api.dataplatform.knmi.nl/wms/adaguc-server';
 
-  final String? wmsApiKey;
+  String? _wmsApiKey;
+  String? get wmsApiKey => _wmsApiKey;
   final KnmiApiClient _client;
   final CacheStore _cache;
 
   String get _baseHost =>
-      wmsApiKey != null ? _authenticatedHost : _anonymousHost;
+      _wmsApiKey != null ? _authenticatedHost : _anonymousHost;
 
   Map<String, String>? get _authHeaders =>
-      wmsApiKey != null ? {'Authorization': wmsApiKey!} : null;
+      _wmsApiKey != null ? {'Authorization': _wmsApiKey!} : null;
+
+  /// Update the active API key at runtime.
+  ///
+  /// `null` or empty value switches back to the anonymous endpoint.
+  void setWmsApiKey(String? key) {
+    _wmsApiKey = _sanitizeKey(key);
+  }
 
   static String? _sanitizeKey(String? key) {
-    if (key == _placeholderKey) {
+    final trimmed = key?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    if (trimmed == _placeholderKey) {
       debugPrint(
         'KNMIService: KNMI_WMS_API_KEY is still set to the example placeholder. '
         'Falling back to anonymous access.',
       );
       return null;
     }
-    return key;
+    return trimmed;
   }
 
   // ---------------------------------------------------------------------------
@@ -193,7 +205,7 @@ class KNMIService implements RadarProvider {
     final headers = <String, String>{
       'Accept': 'application/json',
       // ignore: use_null_aware_elements -- map-value null guard, not a key.
-      if (wmsApiKey != null) 'Authorization': wmsApiKey!,
+      if (_wmsApiKey != null) 'Authorization': _wmsApiKey!,
     };
 
     final mergedData = <String, dynamic>{};

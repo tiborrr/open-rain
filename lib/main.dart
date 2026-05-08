@@ -12,11 +12,13 @@ import 'services/location_service.dart';
 import 'services/open_meteo_service.dart';
 import 'services/rain_notification_service.dart';
 import 'theme.dart';
+import 'utils/knmi_api_key_store.dart';
 import 'view_models/home_view_model.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load();
+  final persistedKnmiApiKey = await KnmiApiKeyStore.load();
 
   // Rain alerts: initialize eagerly so the background task is scheduled on
   // first launch and notification permissions are requested as part of the
@@ -28,7 +30,12 @@ Future<void> main() async {
     debugPrint('Failed to initialize rain notifications: $e\n$st');
   }
 
-  runApp(MyApp(rainNotifications: rainNotifications));
+  runApp(
+    MyApp(
+      rainNotifications: rainNotifications,
+      persistedKnmiApiKey: persistedKnmiApiKey,
+    ),
+  );
 }
 
 /// App composition root.
@@ -40,15 +47,24 @@ Future<void> main() async {
 /// the view-model uses `ChangeNotifierProvider` so its `dispose` runs when
 /// the tree is torn down.
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, required this.rainNotifications});
+  const MyApp({
+    super.key,
+    required this.rainNotifications,
+    required this.persistedKnmiApiKey,
+  });
 
   final RainNotificationService rainNotifications;
+  final String? persistedKnmiApiKey;
 
   @override
   Widget build(BuildContext context) {
     final weatherProvider = OpenMeteoService();
+    final persistedKnmiKey = _effectiveKnmiApiKey(
+      envKey: dotenv.env['KNMI_WMS_API_KEY'],
+      persistedKey: persistedKnmiApiKey,
+    );
     final radarProvider = KNMIService(
-      wmsApiKey: dotenv.env['KNMI_WMS_API_KEY'],
+      wmsApiKey: persistedKnmiKey,
     );
     final weatherRepository = WeatherRepository(weatherProvider);
     final radarRepository = RadarRepository(radarProvider);
@@ -81,5 +97,18 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
       ),
     );
+  }
+
+  static String? _effectiveKnmiApiKey({
+    required String? envKey,
+    required String? persistedKey,
+  }) {
+    final normalizedPersisted = persistedKey?.trim();
+    if (normalizedPersisted != null && normalizedPersisted.isNotEmpty) {
+      return normalizedPersisted;
+    }
+    final normalizedEnv = envKey?.trim();
+    if (normalizedEnv == null || normalizedEnv.isEmpty) return null;
+    return normalizedEnv;
   }
 }
