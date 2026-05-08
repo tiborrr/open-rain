@@ -30,6 +30,11 @@ class AttributionFooter extends StatelessWidget {
             label: 'Map tiles by CartoCDN',
             url: 'https://carto.com/attributions',
           ),
+          Text('·', style: _style(context)),
+          _AttributionLink(
+            label: 'Privacy policy',
+            url: 'https://tiborrr.github.io/open-rain/privacy-policy/',
+          ),
         ],
       ),
     );

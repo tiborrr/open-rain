@@ -35,6 +35,22 @@ jobs:
       - name: Build web
         run: flutter build web --release --base-href /open-rain/
 
+      - name: Install pandoc (for Markdown → HTML)
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Add privacy policy (generate from Markdown)
+        run: |
+          mkdir -p build/web/privacy-policy
+          cp docs/privacy-policy/style.css build/web/privacy-policy/style.css
+          pandoc docs/privacy-policy/index.md \
+            --from=gfm \
+            --standalone \
+            --include-in-header=docs/privacy-policy/head-cdn.html \
+            --include-before-body=docs/privacy-policy/body-start.html \
+            --include-after-body=docs/privacy-policy/body-end.html \
+            --css style.css \
+            -o build/web/privacy-policy/index.html
+
       - name: Disable Jekyll processing
         run: touch build/web/.nojekyll
 

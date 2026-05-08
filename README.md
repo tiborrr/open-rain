@@ -7,6 +7,10 @@
 
 A Flutter weather app focused on precipitation, featuring an animated radar map and minute-by-minute nowcasting. The web build uses the **Open Rain** document title; iOS, Android, macOS, and web are supported targets.
 
+## Legal
+
+- **Privacy Policy**: `https://tiborrr.github.io/open-rain/privacy-policy/`
+
 ## Features
 
 - **Live radar map** with animated WMS tiles from KNMI (Netherlands Royal Meteorological Institute)
