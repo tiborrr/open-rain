@@ -93,6 +93,12 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Open Rain',
         theme: AppTheme.lightTheme,
+        builder: (context, child) => Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
         home: const HomeScreen(),
         debugShowCheckedModeBanner: false,
       ),
