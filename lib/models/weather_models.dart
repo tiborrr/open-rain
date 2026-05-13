@@ -9,7 +9,7 @@ class WeatherData {
   final String timezone;
   final WeatherAlert? alert;
   final AirQuality? airQuality;
-  
+
   /// Surrounding precipitation data points, mapped by their coordinates.
   final Map<LatLng, MinutelyForecast> neighbors;
 
@@ -87,11 +87,20 @@ class HourlyForecast {
     required this.weatherCodes,
   });
 
-  factory HourlyForecast.fromJson(Map<String, dynamic> json, [int offsetSeconds = 0]) {
+  factory HourlyForecast.fromJson(
+    Map<String, dynamic> json, [
+    int offsetSeconds = 0,
+  ]) {
     return HourlyForecast(
-      times: (json['time'] as List).map((t) => WeatherData.parseTime(t.toString(), offsetSeconds)).toList(),
-      temperatures: (json['temperature_2m'] as List).map((t) => (t as num).toDouble()).toList(),
-      weatherCodes: (json['weather_code'] as List).map((c) => (c as num).toInt()).toList(),
+      times: (json['time'] as List)
+          .map((t) => WeatherData.parseTime(t.toString(), offsetSeconds))
+          .toList(),
+      temperatures: (json['temperature_2m'] as List)
+          .map((t) => (t as num).toDouble())
+          .toList(),
+      weatherCodes: (json['weather_code'] as List)
+          .map((c) => (c as num).toInt())
+          .toList(),
     );
   }
 }
@@ -100,23 +109,27 @@ class MinutelyForecast {
   final List<DateTime> times;
   final List<double> precipitation;
 
-  MinutelyForecast({
-    required this.times,
-    required this.precipitation,
-  });
+  MinutelyForecast({required this.times, required this.precipitation});
 
-  factory MinutelyForecast.fromJson(Map<String, dynamic> json, [int offsetSeconds = 0]) {
+  factory MinutelyForecast.fromJson(
+    Map<String, dynamic> json, [
+    int offsetSeconds = 0,
+  ]) {
     return MinutelyForecast(
-      times: (json['time'] as List).map((t) => WeatherData.parseTime(t.toString(), offsetSeconds)).toList(),
-      precipitation: (json['precipitation'] as List).map((p) => (p as num).toDouble()).toList(),
+      times: (json['time'] as List)
+          .map((t) => WeatherData.parseTime(t.toString(), offsetSeconds))
+          .toList(),
+      precipitation: (json['precipitation'] as List)
+          .map((p) => (p as num).toDouble())
+          .toList(),
     );
   }
 
   /// Returns the entry of [times] closest to [epochMsUtc] (UTC milliseconds).
   ///
   /// Used by the precipitation chart scrubber to snap touch positions onto the
-  /// Open-Meteo 15-minute grid instead of arbitrary axis pixels. Returns `null`
-  /// when [times] is empty. On exact ties, the earlier timestamp wins so the
+  /// plotted timeline instead of arbitrary axis pixels. Returns `null` when
+  /// [times] is empty. On exact ties, the earlier timestamp wins so the
   /// behavior is deterministic.
   DateTime? nearestTimeUtcToMillis(int epochMsUtc) {
     if (times.isEmpty) return null;
@@ -147,12 +160,23 @@ class DailyForecast {
     required this.weatherCodes,
   });
 
-  factory DailyForecast.fromJson(Map<String, dynamic> json, [int offsetSeconds = 0]) {
+  factory DailyForecast.fromJson(
+    Map<String, dynamic> json, [
+    int offsetSeconds = 0,
+  ]) {
     return DailyForecast(
-      times: (json['time'] as List).map((t) => WeatherData.parseTime(t.toString(), offsetSeconds)).toList(),
-      maxTemps: (json['temperature_2m_max'] as List).map((t) => (t as num).toDouble()).toList(),
-      minTemps: (json['temperature_2m_min'] as List).map((t) => (t as num).toDouble()).toList(),
-      weatherCodes: (json['weather_code'] as List).map((c) => (c as num).toInt()).toList(),
+      times: (json['time'] as List)
+          .map((t) => WeatherData.parseTime(t.toString(), offsetSeconds))
+          .toList(),
+      maxTemps: (json['temperature_2m_max'] as List)
+          .map((t) => (t as num).toDouble())
+          .toList(),
+      minTemps: (json['temperature_2m_min'] as List)
+          .map((t) => (t as num).toDouble())
+          .toList(),
+      weatherCodes: (json['weather_code'] as List)
+          .map((c) => (c as num).toInt())
+          .toList(),
     );
   }
 }
@@ -174,11 +198,7 @@ class AirQuality {
   final double pm2_5;
   final double ozone;
 
-  AirQuality({
-    required this.aqi,
-    required this.pm2_5,
-    required this.ozone,
-  });
+  AirQuality({required this.aqi, required this.pm2_5, required this.ozone});
 
   factory AirQuality.fromJson(Map<String, dynamic> json) {
     return AirQuality(

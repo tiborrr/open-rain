@@ -5,7 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../controllers/radar_controller.dart';
 import '../models/weather_models.dart';
 
-/// Layout and axis tuning for the Open-Meteo minutely precipitation chart.
+/// Layout and axis tuning for the precipitation chart timeline.
 abstract final class _PrecipitationChartLayout {
   _PrecipitationChartLayout._();
 
@@ -160,10 +160,10 @@ class PrecipitationChart extends StatelessWidget {
                                   touchResponse.lineBarSpots != null) {
                                 final xMs = touchResponse.lineBarSpots!.first.x
                                     .toInt();
-                                // Snap to the nearest Open-Meteo minutely_15 timestamp so the
-                                // scrubber tracks the plotted points instead of arbitrary
-                                // axis pixels. Falls back to the raw touch time when the
-                                // forecast series is empty.
+                                // Snap to the nearest plotted timestamp so the scrubber
+                                // tracks chart points instead of arbitrary axis pixels.
+                                // Falls back to the raw touch time when the series is
+                                // empty.
                                 final target =
                                     forecast.nearestTimeUtcToMillis(xMs) ??
                                     DateTime.fromMillisecondsSinceEpoch(
@@ -219,25 +219,17 @@ class PrecipitationChart extends StatelessWidget {
                         sideTitles: SideTitles(
                           showTitles: true,
                           interval: titleIntervalMs,
-                          // Skip the bookend ticks at min/max so the edge
-                          // labels don't collide with the first/last
-                          // interval label on narrow time spans.
-                          minIncluded: false,
-                          maxIncluded: false,
                           getTitlesWidget: (value, meta) {
+                            // Convert UTC x-axis value to location local time
                             final time = DateTime.fromMillisecondsSinceEpoch(
                               value.toInt(),
                               isUtc: true,
                             ).add(utcOffset);
-                            return SideTitleWidget(
-                              meta: meta,
-                              space: 6,
-                              child: Text(
-                                '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.labelSmall?.copyWith(fontSize: 10),
-                              ),
+                            return Text(
+                              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                              style: Theme.of(
+                                context,
+                              ).textTheme.labelSmall?.copyWith(fontSize: 10),
                             );
                           },
                         ),
@@ -278,13 +270,24 @@ class PrecipitationChart extends StatelessWidget {
                       LineChartBarData(
                         spots: chartSpots,
                         isCurved: true,
-                        color: Colors.blue,
+                        color: Theme.of(context).colorScheme.primary,
                         barWidth: 3,
                         isStrokeCapRound: true,
                         dotData: const FlDotData(show: false),
                         belowBarData: BarAreaData(
                           show: true,
-                          color: Colors.blue.withValues(alpha: 0.4),
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.3),
+                              Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.0),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
                         ),
                       ),
                     ],
