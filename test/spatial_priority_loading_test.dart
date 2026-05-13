@@ -24,17 +24,17 @@ class MockLocationService extends LocationService {
   Stream<Position> getPositionStream() => const Stream.empty();
 
   Position _pos(double lat, double lon) => Position(
-        latitude: lat,
-        longitude: lon,
-        timestamp: DateTime.now(),
-        accuracy: 0,
-        altitude: 0,
-        heading: 0,
-        speed: 0,
-        speedAccuracy: 0,
-        altitudeAccuracy: 0,
-        headingAccuracy: 0,
-      );
+    latitude: lat,
+    longitude: lon,
+    timestamp: DateTime.now(),
+    accuracy: 0,
+    altitude: 0,
+    heading: 0,
+    speed: 0,
+    speedAccuracy: 0,
+    altitudeAccuracy: 0,
+    headingAccuracy: 0,
+  );
 }
 
 class MockWeatherProvider implements WeatherProvider {
@@ -56,7 +56,11 @@ class MockWeatherProvider implements WeatherProvider {
           lat: lat,
           lon: lon,
         ),
-        hourly: HourlyForecast(times: const [], temperatures: const [], weatherCodes: const []),
+        hourly: HourlyForecast(
+          times: const [],
+          temperatures: const [],
+          weatherCodes: const [],
+        ),
         minutely: MinutelyForecast(times: const [], precipitation: const []),
         daily: DailyForecast(
           times: const [],
@@ -76,8 +80,8 @@ class MockRadarProvider implements RadarProvider {
 
   @override
   Future<Result<List<RadarFrame>>> fetchRadarFrames() async => Result.ok([
-        RadarFrame(frameId: '2024-01-01T00:00:00Z', time: DateTime.now()),
-      ]);
+    RadarFrame(frameId: '2024-01-01T00:00:00Z', time: DateTime.now()),
+  ]);
 
   @override
   RadarLayerConfig getLayerConfig(RadarFrame frame) =>
@@ -90,44 +94,62 @@ class MockRadarProvider implements RadarProvider {
     required List<RadarFrame> frames,
   }) async {
     callOrder.add(LatLng(lat, lon));
-    return Result.ok(MinutelyForecast(times: const [], precipitation: const []));
+    return Result.ok(
+      MinutelyForecast(times: const [], precipitation: const []),
+    );
   }
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('HomeViewModel should fetch neighbors by distance (no center KNMI GFI)',
-      () async {
-    final mockRadarProvider = MockRadarProvider();
-    final radarRepo = RadarRepository(mockRadarProvider);
-    final weatherRepo = WeatherRepository(MockWeatherProvider());
+  test(
+    'HomeViewModel should fetch center first, then neighbors by distance',
+    () async {
+      final mockRadarProvider = MockRadarProvider();
+      final radarRepo = RadarRepository(mockRadarProvider);
+      final weatherRepo = WeatherRepository(MockWeatherProvider());
 
-    final viewModel = HomeViewModel(
-      weatherRepository: weatherRepo,
-      radarRepository: radarRepo,
-      locationService: MockLocationService(),
-    );
+      final viewModel = HomeViewModel(
+        weatherRepository: weatherRepo,
+        radarRepository: radarRepo,
+        locationService: MockLocationService(),
+      );
 
-    await viewModel.loadDashboard.execute(
-      const LocationSelection(lat: 52.3676, lon: 4.9041, name: 'Amsterdam'),
-    );
+      await viewModel.loadDashboard.execute(
+        const LocationSelection(lat: 52.3676, lon: 4.9041, name: 'Amsterdam'),
+      );
 
-    // Background neighbor fetch fires-and-forgets after the command completes.
-    await Future<void>.delayed(const Duration(milliseconds: 500));
+      // Background neighbor fetch fires-and-forgets after the command completes.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
 
-    final calls = mockRadarProvider.callOrder;
-    expect(calls.length, 8);
+      final calls = mockRadarProvider.callOrder;
+      expect(calls.length, 9);
+      expect(calls.first.latitude, closeTo(52.3676, 1e-6));
+      expect(calls.first.longitude, closeTo(4.9041, 1e-6));
 
-    for (var i = 0; i < calls.length - 1; i++) {
-      final distCurrent = Geolocator.distanceBetween(
-          52.3676, 4.9041, calls[i].latitude, calls[i].longitude);
-      final distNext = Geolocator.distanceBetween(
-          52.3676, 4.9041, calls[i + 1].latitude, calls[i + 1].longitude);
-      expect(distCurrent <= distNext, isTrue,
-          reason: 'Call at index $i is further than call at index ${i + 1}');
-    }
+      final neighborCalls = calls.skip(1).toList();
+      for (var i = 0; i < neighborCalls.length - 1; i++) {
+        final distCurrent = Geolocator.distanceBetween(
+          52.3676,
+          4.9041,
+          neighborCalls[i].latitude,
+          neighborCalls[i].longitude,
+        );
+        final distNext = Geolocator.distanceBetween(
+          52.3676,
+          4.9041,
+          neighborCalls[i + 1].latitude,
+          neighborCalls[i + 1].longitude,
+        );
+        expect(
+          distCurrent <= distNext,
+          isTrue,
+          reason: 'Call at index $i is further than call at index ${i + 1}',
+        );
+      }
 
-    expect(viewModel.weatherData?.neighbors.length, 8);
-  });
+      expect(viewModel.weatherData?.neighbors.length, 8);
+    },
+  );
 }

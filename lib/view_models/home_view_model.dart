@@ -44,13 +44,12 @@ class HomeViewModel extends ChangeNotifier {
     required RadarRepository radarRepository,
     required LocationService locationService,
     Future<void> Function(double lat, double lon)? onLocationResolved,
-  })  : _weatherRepository = weatherRepository,
-        _radarRepository = radarRepository,
-        _locationService = locationService,
-        _onLocationResolved = onLocationResolved {
+  }) : _weatherRepository = weatherRepository,
+       _radarRepository = radarRepository,
+       _locationService = locationService,
+       _onLocationResolved = onLocationResolved {
     loadDashboard = Command1<void, LocationSelection?>(_loadDashboard);
-    searchCities =
-        Command1<List<LocationResult>, String>(_searchCities);
+    searchCities = Command1<List<LocationResult>, String>(_searchCities);
     _initLocationListener();
   }
 
@@ -103,8 +102,7 @@ class HomeViewModel extends ChangeNotifier {
   String? get locationFallbackMessage => _locationFallbackMessage;
 
   /// True only on the first load before any data is available.
-  bool get isInitialLoading =>
-      loadDashboard.running && _weatherData == null;
+  bool get isInitialLoading => loadDashboard.running && _weatherData == null;
 
   // ---------------------------------------------------------------------------
   // User intent helpers
@@ -127,34 +125,36 @@ class HomeViewModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   void _initLocationListener() {
-    _locationSubscription =
-        _locationService.getPositionStream().listen((position) {
-      if (!_useGps || loadDashboard.running) return;
-      if (_lastUpdatePosition != null) {
-        final distance = Geolocator.distanceBetween(
-          _lastUpdatePosition!.latitude,
-          _lastUpdatePosition!.longitude,
-          position.latitude,
-          position.longitude,
-        );
-        if (distance < _moveThresholdMeters) {
-          debugPrint(
-            'Skip dashboard refresh: User moved only ${distance.toStringAsFixed(1)}m',
+    _locationSubscription = _locationService.getPositionStream().listen(
+      (position) {
+        if (!_useGps || loadDashboard.running) return;
+        if (_lastUpdatePosition != null) {
+          final distance = Geolocator.distanceBetween(
+            _lastUpdatePosition!.latitude,
+            _lastUpdatePosition!.longitude,
+            position.latitude,
+            position.longitude,
           );
-          return;
+          if (distance < _moveThresholdMeters) {
+            debugPrint(
+              'Skip dashboard refresh: User moved only ${distance.toStringAsFixed(1)}m',
+            );
+            return;
+          }
         }
-      }
-      _lastUpdatePosition = position;
-      loadDashboard.execute(
-        LocationSelection(
-          lat: position.latitude,
-          lon: position.longitude,
-          name: _currentLocationName,
-        ),
-      );
-    }, onError: (error) {
-      debugPrint('Location stream error: $error');
-    });
+        _lastUpdatePosition = position;
+        loadDashboard.execute(
+          LocationSelection(
+            lat: position.latitude,
+            lon: position.longitude,
+            name: _currentLocationName,
+          ),
+        );
+      },
+      onError: (error) {
+        debugPrint('Location stream error: $error');
+      },
+    );
   }
 
   @override
@@ -188,8 +188,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Hand Open-Meteo a horizon hint covering the last KNMI frame; the
     // service rounds this up to the next 15-min `forecast_minutely_15` step.
-    final endHint =
-        allFrames.isNotEmpty ? allFrames.last.time : null;
+    final endHint = allFrames.isNotEmpty ? allFrames.last.time : null;
 
     final weatherResult = await _weatherRepository.getWeatherData(
       lat: lat,
@@ -197,26 +196,68 @@ class HomeViewModel extends ChangeNotifier {
       endTime: endHint,
     );
     return switch (weatherResult) {
-      Ok<WeatherData>(value: final data) => () {
-          // Align the radar timeline with whatever Open-Meteo actually
-          // returned. KNMI publishes 5-min frames spanning history + forecast
-          // (`historyLookback` past + capabilities `END` future); Open-Meteo's
-          // `minutely_15` is on the 15-min grid with no history. By clipping
-          // KNMI frames to `[minutely.times.first, minutely.times.last]`, the
-          // chart x-range and the radar playback range share the exact same
-          // start and end instants.
-          _radarFrames = _alignFramesToMinutely(allFrames, data.minutely);
-          _weatherData = _withNeighbors(data);
-          notifyListeners();
-          if (_radarFrames.isNotEmpty) {
-            unawaited(_fetchNeighbors(lat, lon, _radarFrames));
-          }
-          return const Result<void>.ok(null);
-        }(),
-      Err<WeatherData>(error: final e) => () {
-          return Result<void>.err(e);
-        }(),
+      Ok<WeatherData>(value: final data) => await _onWeatherDataLoaded(
+        data: data,
+        allFrames: allFrames,
+        lat: lat,
+        lon: lon,
+      ),
+      Err<WeatherData>(error: final e) => Result<void>.err(e),
     };
+  }
+
+  Future<Result<void>> _onWeatherDataLoaded({
+    required WeatherData data,
+    required List<RadarFrame> allFrames,
+    required double lat,
+    required double lon,
+  }) async {
+    final chartForecast = await _resolveChartForecast(
+      lat: lat,
+      lon: lon,
+      frames: allFrames,
+      fallback: data.minutely,
+    );
+    // Keep radar playback and chart timeline in the same UTC window by
+    // clipping KNMI frames to the chosen chart series (KNMI when available,
+    // otherwise Open-Meteo fallback).
+    _radarFrames = _alignFramesToMinutely(allFrames, chartForecast);
+    _weatherData = _withNeighbors(_withChartForecast(data, chartForecast));
+    notifyListeners();
+    if (_radarFrames.isNotEmpty) {
+      unawaited(_fetchNeighbors(lat, lon, _radarFrames));
+    }
+    return const Result<void>.ok(null);
+  }
+
+  Future<MinutelyForecast> _resolveChartForecast({
+    required double lat,
+    required double lon,
+    required List<RadarFrame> frames,
+    required MinutelyForecast fallback,
+  }) async {
+    if (frames.isEmpty) return fallback;
+    final result = await _radarRepository.getPrecipitationSeries(
+      lat: lat,
+      lon: lon,
+      frames: frames,
+    );
+    return switch (result) {
+      Ok<MinutelyForecast?>(value: final forecast)
+          when _isUsableForecast(forecast) =>
+        forecast!,
+      Ok<MinutelyForecast?>(value: _) => fallback,
+      Err<MinutelyForecast?>(error: final e) => () {
+        debugPrint('Failed to get center KNMI precipitation: $e');
+        return fallback;
+      }(),
+    };
+  }
+
+  static bool _isUsableForecast(MinutelyForecast? forecast) {
+    if (forecast == null) return false;
+    if (forecast.times.isEmpty || forecast.precipitation.isEmpty) return false;
+    return forecast.times.length == forecast.precipitation.length;
   }
 
   static List<RadarFrame> _alignFramesToMinutely(
@@ -289,6 +330,20 @@ class HomeViewModel extends ChangeNotifier {
     );
   }
 
+  WeatherData _withChartForecast(WeatherData data, MinutelyForecast minutely) {
+    return WeatherData(
+      current: data.current,
+      hourly: data.hourly,
+      minutely: minutely,
+      daily: data.daily,
+      utcOffset: data.utcOffset,
+      timezone: data.timezone,
+      alert: data.alert,
+      airQuality: data.airQuality,
+      neighbors: data.neighbors,
+    );
+  }
+
   Future<void> _fetchNeighbors(
     double lat,
     double lon,
@@ -305,10 +360,18 @@ class HomeViewModel extends ChangeNotifier {
     ];
 
     points.sort((a, b) {
-      final distA =
-          Geolocator.distanceBetween(lat, lon, a.latitude, a.longitude);
-      final distB =
-          Geolocator.distanceBetween(lat, lon, b.latitude, b.longitude);
+      final distA = Geolocator.distanceBetween(
+        lat,
+        lon,
+        a.latitude,
+        a.longitude,
+      );
+      final distB = Geolocator.distanceBetween(
+        lat,
+        lon,
+        b.latitude,
+        b.longitude,
+      );
       return distA.compareTo(distB);
     });
 
