@@ -66,59 +66,62 @@ class _LocationSearchOverlayState extends State<LocationSearchOverlay> {
               onChanged: _performSearch,
             ),
           ),
-          body: Column(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.my_location),
-                title: const Text('Use Current Location'),
-                onTap: () {
-                  viewModel.resetToGps();
-                  Navigator.pop(context);
-                },
-              ),
-              ListenableBuilder(
-                listenable: viewModel.searchCities,
-                builder: (context, _) {
-                  if (viewModel.searchCities.running) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-              Expanded(
-                child: ListenableBuilder(
-                  listenable: viewModel.searchCities,
-                  builder: (context, _) {
-                    final result = viewModel.searchCities.result;
-                    final results = switch (result) {
-                      Ok<List<LocationResult>>(value: final v) => v,
-                      _ => const <LocationResult>[],
-                    };
-                    return ListView.builder(
-                      itemCount: results.length,
-                      itemBuilder: (context, index) {
-                        final result = results[index];
-                        return ListTile(
-                          leading: const Icon(Icons.location_city),
-                          title: Text(result.name),
-                          onTap: () {
-                            viewModel.setManualLocation(
-                              result.latitude,
-                              result.longitude,
-                              result.name,
-                            );
-                            Navigator.pop(context);
-                          },
-                        );
-                      },
-                    );
+          body: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.my_location),
+                  title: const Text('Use Current Location'),
+                  onTap: () {
+                    viewModel.resetToGps();
+                    Navigator.pop(context);
                   },
                 ),
-              ),
-            ],
+                ListenableBuilder(
+                  listenable: viewModel.searchCities,
+                  builder: (context, _) {
+                    if (viewModel.searchCities.running) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: viewModel.searchCities,
+                    builder: (context, _) {
+                      final result = viewModel.searchCities.result;
+                      final results = switch (result) {
+                        Ok<List<LocationResult>>(value: final v) => v,
+                        _ => const <LocationResult>[],
+                      };
+                      return ListView.builder(
+                        itemCount: results.length,
+                        itemBuilder: (context, index) {
+                          final result = results[index];
+                          return ListTile(
+                            leading: const Icon(Icons.location_city),
+                            title: Text(result.name),
+                            onTap: () {
+                              viewModel.setManualLocation(
+                                result.latitude,
+                                result.longitude,
+                                result.name,
+                              );
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
