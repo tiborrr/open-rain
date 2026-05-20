@@ -112,27 +112,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final radarProvider = context.read<RadarProvider>();
 
     return Scaffold(
-      body: ListenableBuilder(
-        listenable: vm.loadDashboard,
-        builder: (context, _) {
-          if (vm.isInitialLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final data = vm.weatherData;
-          if (data == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Text(
-                  'Failed to load weather data: '
-                  '${vm.loadDashboard.errorObject ?? "unknown error"}',
-                  textAlign: TextAlign.center,
+      body: SafeArea(
+        child: ListenableBuilder(
+          listenable: vm.loadDashboard,
+          builder: (context, _) {
+            if (vm.isInitialLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final data = vm.weatherData;
+            if (data == null) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Text(
+                    'Failed to load weather data: '
+                    '${vm.loadDashboard.errorObject ?? "unknown error"}',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              ),
-            );
-          }
-          return _buildDashboard(context, vm, radarProvider);
-        },
+              );
+            }
+            return _buildDashboard(context, vm, radarProvider);
+          },
+        ),
       ),
     );
   }
@@ -145,10 +147,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final weather = vm.weatherData!;
     final loading = vm.loadDashboard.running;
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-        child: Column(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
@@ -278,7 +279,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const AttributionFooter(),
           ],
         ),
-      ),
     );
   }
 

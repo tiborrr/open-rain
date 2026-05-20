@@ -20,4 +20,22 @@ void main() {
     // The app starts in loading/initial state — a progress indicator is shown.
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
+
+  testWidgets('HomeScreen respects system insets via SafeArea', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          padding: EdgeInsets.only(top: 48, bottom: 34),
+        ),
+        child: MyApp(
+          rainNotifications: RainNotificationService(),
+          persistedKnmiApiKey: null,
+        ),
+      ),
+    );
+
+    expect(find.byType(SafeArea), findsWidgets);
+  });
 }
