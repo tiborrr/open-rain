@@ -76,17 +76,19 @@ class PrecipitationNowcastService {
 
     void run() async {
       try {
-        final allFrames = preloadedFrames ??
-            await getRadarFrames(forceRefresh: forceRefresh);
-        if (isCanceled) return;
-
-        final endHint = allFrames.isNotEmpty ? allFrames.last.time : null;
-        final weatherResult = await _weatherProvider.fetchWeather(
+        final framesFuture = preloadedFrames != null
+            ? Future.value(preloadedFrames)
+            : getRadarFrames(forceRefresh: forceRefresh);
+        final weatherFuture = _weatherProvider.fetchWeather(
           lat: lat,
           lon: lon,
-          endTime: endHint,
         );
+
+        final results = await Future.wait([framesFuture, weatherFuture]);
         if (isCanceled) return;
+
+        final allFrames = results[0] as List<RadarFrame>;
+        final weatherResult = results[1] as Result<WeatherData>;
 
         if (weatherResult is! Ok<WeatherData>) {
           final error = (weatherResult as Err<WeatherData>).error;

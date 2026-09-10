@@ -142,16 +142,18 @@ class LocationService implements LocationProvider {
     return await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.medium,
+        timeLimit: Duration(seconds: 3),
       ),
-    ).timeout(const Duration(seconds: 10));
+    ).timeout(const Duration(seconds: 3));
   }
 
   /// Translates coordinates into a city name.
   @visibleForTesting
   Future<String?> getCityFromCoordinates(double lat, double lon) async {
     try {
-      final List<Placemark> placemarks =
-          await _geocoding.placemarkFromCoordinates(lat, lon);
+      final List<Placemark> placemarks = await _geocoding
+          .placemarkFromCoordinates(lat, lon)
+          .timeout(const Duration(seconds: 2));
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
         return place.locality ??
