@@ -79,7 +79,7 @@
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.example.flutter_weather.rainCheck</string>
+		<string>com.casteleijn.openrain.rainCheck</string>
 	</array>
 </dict>
 </plist>

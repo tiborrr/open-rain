@@ -13,7 +13,7 @@ import workmanager_apple
     // the rain check. The identifier MUST match the one used on the Dart side
     // in rain_notification_service_io.dart and in Info.plist.
     WorkmanagerPlugin.registerPeriodicTask(
-      withIdentifier: "com.example.flutter_weather.rainCheck",
+      withIdentifier: "com.casteleijn.openrain.rainCheck",
       frequency: NSNumber(value: 15 * 60)
     )
 
