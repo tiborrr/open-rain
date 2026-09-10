@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/radar_provider.dart';
@@ -21,11 +20,12 @@ Future<void> main() async {
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
-  await dotenv.load();
   final persistedKnmiApiKey = await KnmiApiKeyStore.load();
 
   // Rain alerts: initialize eagerly so the background task is scheduled on
@@ -67,8 +67,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final weatherProvider = OpenMeteoService();
+    const envKnmiKey = String.fromEnvironment('KNMI_WMS_API_KEY');
     final persistedKnmiKey = _effectiveKnmiApiKey(
-      envKey: dotenv.env['KNMI_WMS_API_KEY'],
+      envKey: envKnmiKey.isEmpty ? null : envKnmiKey,
       persistedKey: persistedKnmiApiKey,
     );
     final radarProvider = KNMIService(

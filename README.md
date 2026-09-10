@@ -1,6 +1,6 @@
 # Open Rain — Flutter Weather App
 
-**Version:** 1.5.0 (see `pubspec.yaml` for the full `version` + build number).
+**Version:** 1.10.0 (see `pubspec.yaml` for the full `version` + build number).
 
 > [!NOTE]
 > This project began as an experiment with **Google Stitch** and **Antigravity**. It is now developed in **[Cursor](https://cursor.com/)**, primarily through pair-programming with **Opus 4.7**, to keep exploring agentic coding and automated UI design.
@@ -49,8 +49,10 @@ KNMI_WMS_API_KEY=your_key_here
 
 ### 3. Run
 
+Run with Dart define environment variables:
+
 ```bash
-flutter run
+flutter run --dart-define-from-file=.env
 ```
 
 ## Attribution
