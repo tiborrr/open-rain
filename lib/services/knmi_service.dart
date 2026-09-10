@@ -145,7 +145,7 @@ class KNMIService implements RadarProvider {
         );
         final response = await _client.get(uri, headers: _authHeaders);
         return switch (response) {
-          KnmiSuccess s => [
+          final KnmiSuccess s => [
               for (final t in KnmiCapabilities.computeFrameTimes(
                 s.response.body,
                 nowUtc: DateTime.now().toUtc(),
@@ -209,7 +209,7 @@ class KNMIService implements RadarProvider {
     };
 
     final mergedData = <String, dynamic>{};
-    final chunkSize = KnmiRadarConstants.gfiTimestampsPerRequest;
+    const chunkSize = KnmiRadarConstants.gfiTimestampsPerRequest;
 
     for (var i = 0; i < frames.length; i += chunkSize) {
       final chunk = frames.skip(i).take(chunkSize).toList();
@@ -217,7 +217,7 @@ class KNMIService implements RadarProvider {
 
       final result = await _client.get(uri, headers: headers);
       switch (result) {
-        case KnmiSuccess s:
+        case final KnmiSuccess s:
           final decoded = KnmiGfi.decodeBody(s.response);
           if (decoded is List && decoded.isNotEmpty) {
             mergedData.addAll(decoded[0]['data'] as Map<String, dynamic>);
@@ -226,7 +226,7 @@ class KNMIService implements RadarProvider {
           // Circuit breaker open — surface a partial-or-null payload rather
           // than letting an exception take down the dashboard.
           return null;
-        case KnmiError e:
+        case final KnmiError e:
           debugPrint('KNMI WMS GFI Error: ${e.statusCode} ${e.body}');
           return null;
       }
@@ -243,7 +243,7 @@ class KNMIService implements RadarProvider {
     required double lon,
     required List<RadarFrame> chunk,
   }) {
-    final delta = KnmiRadarConstants.gfiBoundingBoxHalfDeltaDegrees;
+    const delta = KnmiRadarConstants.gfiBoundingBoxHalfDeltaDegrees;
     final start = chunk.first.time.toIso8601String().substring(0, 19);
     final end = chunk.last.time.toIso8601String().substring(0, 19);
     return Uri.parse(
@@ -268,8 +268,6 @@ class KNMIService implements RadarProvider {
       wmsOptions: WMSTileLayerOptions(
         baseUrl: '$_baseHost?DATASET=radar_forecast_2.0',
         layers: const ['precipitation_nowcast'],
-        format: 'image/png',
-        transparent: true,
         otherParameters: {'TIME': frame.frameId},
       ),
       headers: _authHeaders,

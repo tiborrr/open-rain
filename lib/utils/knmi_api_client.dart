@@ -133,9 +133,9 @@ class KnmiApiClient {
   Future<Uint8List?> getBytes(Uri uri, {Map<String, String>? headers}) async {
     final result = await get(uri, headers: headers);
     return switch (result) {
-      KnmiSuccess s => s.response.bodyBytes.isNotEmpty ? s.response.bodyBytes : null,
+      final KnmiSuccess s => s.response.bodyBytes.isNotEmpty ? s.response.bodyBytes : null,
       KnmiQuotaExceeded _ => null,
-      KnmiError e => throw Exception('KNMI tile error ${e.statusCode}'),
+      final KnmiError e => throw Exception('KNMI tile error ${e.statusCode}'),
     };
   }
 

@@ -52,22 +52,22 @@ class OpenMeteoService implements WeatherProvider {
       final airQualityJson = results[3];
 
       final offsetSeconds = (minutelyJson['utc_offset_seconds'] as num).toInt();
-      final currentMap = Map<String, dynamic>.from(minutelyJson['current']);
+      final currentMap = Map<String, dynamic>.from(minutelyJson['current'] as Map<dynamic, dynamic>);
       currentMap['latitude'] = minutelyJson['latitude'];
       currentMap['longitude'] = minutelyJson['longitude'];
 
       return Result.ok(
         WeatherData(
           current: CurrentWeather.fromJson(currentMap),
-          hourly: HourlyForecast.fromJson(hourlyJson['hourly'], offsetSeconds),
+          hourly: HourlyForecast.fromJson(hourlyJson['hourly'] as Map<String, dynamic>, offsetSeconds),
           minutely: MinutelyForecast.fromJson(
-              minutelyJson['minutely_15'], offsetSeconds),
-          daily: DailyForecast.fromJson(dailyJson['daily'], offsetSeconds),
+              minutelyJson['minutely_15'] as Map<String, dynamic>, offsetSeconds),
+          daily: DailyForecast.fromJson(dailyJson['daily'] as Map<String, dynamic>, offsetSeconds),
           utcOffset: Duration(seconds: offsetSeconds),
           timezone: minutelyJson['timezone'] as String,
           airQuality: airQualityJson['current'] != null
               ? AirQuality.fromJson(
-                  Map<String, dynamic>.from(airQualityJson['current']))
+                  Map<String, dynamic>.from(airQualityJson['current'] as Map<dynamic, dynamic>))
               : null,
         ),
       );
@@ -114,7 +114,7 @@ class OpenMeteoService implements WeatherProvider {
             failure: 'Failed to load minutely weather data');
       },
     );
-    return Map<String, dynamic>.from(raw);
+    return Map<String, dynamic>.from(raw as Map<dynamic, dynamic>);
   }
 
   /// Number of 15-min steps from "now" that covers up to [end], inclusive.
@@ -153,7 +153,7 @@ class OpenMeteoService implements WeatherProvider {
         failure: 'Failed to load hourly weather data',
       ),
     );
-    return Map<String, dynamic>.from(raw);
+    return Map<String, dynamic>.from(raw as Map<dynamic, dynamic>);
   }
 
   Future<Map<String, dynamic>> _fetchDaily(double lat, double lon) async {
@@ -173,7 +173,7 @@ class OpenMeteoService implements WeatherProvider {
         failure: 'Failed to load daily weather data',
       ),
     );
-    return Map<String, dynamic>.from(raw);
+    return Map<String, dynamic>.from(raw as Map<dynamic, dynamic>);
   }
 
   Future<Map<String, dynamic>> _fetchAirQuality(double lat, double lon) async {
@@ -199,7 +199,9 @@ class OpenMeteoService implements WeatherProvider {
         }
       },
     );
-    return raw == null ? <String, dynamic>{} : Map<String, dynamic>.from(raw);
+    return raw == null
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(raw as Map<dynamic, dynamic>);
   }
 
   Future<dynamic> _getJson(Uri uri, {required String failure}) async {

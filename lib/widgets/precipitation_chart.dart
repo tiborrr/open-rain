@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+
 import '../controllers/radar_controller.dart';
 import '../models/weather_models.dart';
 
@@ -147,7 +148,6 @@ class PrecipitationChart extends StatelessWidget {
                 return LineChart(
                   LineChartData(
                     lineTouchData: LineTouchData(
-                      handleBuiltInTouches: true,
                       touchCallback:
                           (
                             FlTouchEvent event,
@@ -208,7 +208,6 @@ class PrecipitationChart extends StatelessWidget {
                                 .millisecondsSinceEpoch
                                 .toDouble(),
                             color: Theme.of(context).colorScheme.onSurface,
-                            strokeWidth: 2,
                             dashArray: [5, 5],
                           ),
                       ],
@@ -255,10 +254,10 @@ class PrecipitationChart extends StatelessWidget {
                         ),
                       ),
                       rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
+                        
                       ),
                       topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
+                        
                       ),
                     ),
                     borderData: FlBorderData(show: false),

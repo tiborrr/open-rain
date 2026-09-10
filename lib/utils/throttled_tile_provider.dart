@@ -41,13 +41,14 @@ class KnmiTileProvider extends TileProvider {
   }
 }
 
+@immutable
 class _KnmiTileImage extends ImageProvider<_KnmiTileImage> {
   final String url;
   final KnmiApiClient apiClient;
   final Map<String, String>? headers;
   final int cacheGeneration;
 
-  _KnmiTileImage(
+  const _KnmiTileImage(
     this.url, {
     required this.apiClient,
     this.headers,
@@ -98,14 +99,14 @@ class _KnmiTileImage extends ImageProvider<_KnmiTileImage> {
       );
 
       return switch (result) {
-        KnmiSuccess s when s.response.bodyBytes.isNotEmpty => () {
+        final KnmiSuccess s when s.response.bodyBytes.isNotEmpty => () {
             final body = s.response.bodyBytes;
             KnmiRasterTileCache.instance.put(key.url, body);
             return _decodeBytes(body, decode);
           }(),
         KnmiQuotaExceeded _ => _transparent(),
         KnmiSuccess _ => _transparent(), // empty body
-        KnmiError e => throw Exception(
+        final KnmiError e => throw Exception(
             'Failed to load tile: ${key.url} (Status: ${e.statusCode})',
           ),
       };
@@ -115,7 +116,7 @@ class _KnmiTileImage extends ImageProvider<_KnmiTileImage> {
       });
       rethrow;
     } finally {
-      chunkEvents.close();
+      unawaited(chunkEvents.close());
     }
   }
 

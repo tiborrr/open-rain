@@ -12,6 +12,7 @@ import 'services/location_service.dart';
 import 'services/open_meteo_service.dart';
 import 'services/rain_notification_service.dart';
 import 'theme.dart';
+import 'utils/env.dart';
 import 'utils/knmi_api_key_store.dart';
 import 'view_models/home_view_model.dart';
 
@@ -67,9 +68,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final weatherProvider = OpenMeteoService();
-    const envKnmiKey = String.fromEnvironment('KNMI_WMS_API_KEY');
     final persistedKnmiKey = _effectiveKnmiApiKey(
-      envKey: envKnmiKey.isEmpty ? null : envKnmiKey,
+      envKey: Env.knmiWmsApiKey,
       persistedKey: persistedKnmiApiKey,
     );
     final radarProvider = KNMIService(

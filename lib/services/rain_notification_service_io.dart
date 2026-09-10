@@ -30,9 +30,7 @@ class PlatformRainNotificationService {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(
-          requestAlertPermission: true,
           requestBadgePermission: false,
-          requestSoundPermission: true,
         ),
       ),
     );
@@ -46,7 +44,6 @@ class PlatformRainNotificationService {
         IOSFlutterLocalNotificationsPlugin>();
     await iosImpl?.requestPermissions(
       alert: true,
-      badge: false,
       sound: true,
     );
 

@@ -78,7 +78,9 @@ class RainViewerService implements RadarProvider {
   List<RadarFrame> _decodeFrames(dynamic raw) {
     if (raw is! List) return const [];
     return [
-      for (final e in raw) RadarFrame.fromJson(Map<String, dynamic>.from(e)),
+      for (final e in raw)
+        RadarFrame.fromJson(
+            Map<String, dynamic>.from(e as Map<dynamic, dynamic>)),
     ];
   }
 

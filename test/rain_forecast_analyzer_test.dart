@@ -6,7 +6,7 @@ void main() {
   group('RainForecastAnalyzer.analyze', () {
     // Anchor "now" to an aligned 15-min boundary so the grid math is easy
     // to read: t0 = now, t1 = now+15m, t2 = now+30m, ...
-    final now = DateTime.utc(2026, 4, 20, 12, 0);
+    final now = DateTime.utc(2026, 4, 20, 12);
     MinutelyForecast forecastFrom(List<double> precip) {
       final times = List<DateTime>.generate(
         precip.length,

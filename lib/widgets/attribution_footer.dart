@@ -16,22 +16,22 @@ class AttributionFooter extends StatelessWidget {
         spacing: 4,
         runSpacing: 4,
         children: [
-          _AttributionLink(
+          const _AttributionLink(
             label: 'Weather data by Open-Meteo.com',
             url: 'https://open-meteo.com/',
           ),
           Text('·', style: _style(context)),
-          _AttributionLink(
+          const _AttributionLink(
             label: 'Radar by KNMI',
             url: 'https://dataplatform.knmi.nl/',
           ),
           Text('·', style: _style(context)),
-          _AttributionLink(
+          const _AttributionLink(
             label: 'Map tiles by CartoCDN',
             url: 'https://carto.com/attributions',
           ),
           Text('·', style: _style(context)),
-          _AttributionLink(
+          const _AttributionLink(
             label: 'Privacy policy',
             url: 'https://tiborrr.github.io/open-rain/privacy-policy/',
           ),

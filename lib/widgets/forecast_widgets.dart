@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../models/weather_models.dart';
-import '../utils/weather_utils.dart';
 import '../theme.dart';
+import '../utils/weather_utils.dart';
 
 class HourlyForecastList extends StatelessWidget {
   final HourlyForecast forecast;

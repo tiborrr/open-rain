@@ -166,7 +166,7 @@ class HomeViewModel extends ChangeNotifier {
           ),
         );
       },
-      onError: (error) {
+      onError: (Object error) {
         debugPrint('Location stream error: $error');
       },
     );
@@ -370,7 +370,7 @@ class HomeViewModel extends ChangeNotifier {
   ) async {
     _neighborForecasts.clear();
 
-    final step = NeighborSamplingConstants.gridStepDegrees;
+    const step = NeighborSamplingConstants.gridStepDegrees;
     final offsets = [-step, 0.0, step];
     final points = <LatLng>[
       for (final dLat in offsets)

@@ -16,7 +16,7 @@ void main() {
     });
 
     test('picks the closer of two surrounding points', () {
-      final earlier = DateTime.utc(2024, 4, 2, 12, 0);
+      final earlier = DateTime.utc(2024, 4, 2, 12);
       final later = DateTime.utc(2024, 4, 2, 12, 15);
       final forecast = MinutelyForecast(times: [earlier, later], precipitation: const [0.0, 0.0]);
 
@@ -28,7 +28,7 @@ void main() {
     });
 
     test('on exact tie, prefers the earlier timestamp', () {
-      final earlier = DateTime.utc(2024, 4, 2, 12, 0);
+      final earlier = DateTime.utc(2024, 4, 2, 12);
       final later = DateTime.utc(2024, 4, 2, 12, 10);
       final forecast = MinutelyForecast(times: [earlier, later], precipitation: const [0.0, 0.0]);
 

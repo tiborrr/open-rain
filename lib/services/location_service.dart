@@ -1,5 +1,5 @@
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 
 class LocationService {
   final Geocoding? _geocodingOverride;
@@ -49,7 +49,7 @@ class LocationService {
   /// Translates coordinates into a city name.
   Future<String?> getCityFromCoordinates(double lat, double lon) async {
     try {
-      List<Placemark> placemarks = await _geocoding.placemarkFromCoordinates(lat, lon);
+      final List<Placemark> placemarks = await _geocoding.placemarkFromCoordinates(lat, lon);
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
         return place.locality ?? place.subAdministrativeArea ?? place.administrativeArea;
@@ -73,8 +73,8 @@ class LocationService {
   /// Searches for coordinates from a query string.
   Future<List<LocationResult>> searchLocations(String query) async {
     try {
-      List<Location> locations = await _geocoding.locationFromAddress(query);
-      List<LocationResult> results = [];
+      final List<Location> locations = await _geocoding.locationFromAddress(query);
+      final List<LocationResult> results = [];
       
       for (var loc in locations) {
         // Reverse geocode to get a nice name

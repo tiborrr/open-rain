@@ -31,4 +31,4 @@ jobs:
         run: flutter analyze --fatal-infos
 
       - name: Unit & widget tests
-        run: flutter test test/rate_limiter_test.dart test/widget_test.dart
+        run: flutter test
