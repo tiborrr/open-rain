@@ -2,6 +2,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
 class LocationService {
+  final Geocoding? _geocodingOverride;
+
+  LocationService({Geocoding? geocoding}) : _geocodingOverride = geocoding;
+
+  Geocoding get _geocoding => _geocodingOverride ?? Geocoding();
+
   /// Fetches the current position of the device.
   /// 
   /// Throws an exception if permissions are denied or services are disabled.
@@ -43,7 +49,7 @@ class LocationService {
   /// Translates coordinates into a city name.
   Future<String?> getCityFromCoordinates(double lat, double lon) async {
     try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
+      List<Placemark> placemarks = await _geocoding.placemarkFromCoordinates(lat, lon);
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
         return place.locality ?? place.subAdministrativeArea ?? place.administrativeArea;
@@ -67,7 +73,7 @@ class LocationService {
   /// Searches for coordinates from a query string.
   Future<List<LocationResult>> searchLocations(String query) async {
     try {
-      List<Location> locations = await locationFromAddress(query);
+      List<Location> locations = await _geocoding.locationFromAddress(query);
       List<LocationResult> results = [];
       
       for (var loc in locations) {

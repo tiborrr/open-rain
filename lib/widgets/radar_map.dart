@@ -109,7 +109,7 @@ class _RadarMapState extends State<RadarMap> {
             TileLayer(
               urlTemplate:
                   'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-              userAgentPackageName: 'com.atmosphere.weather',
+              userAgentPackageName: 'com.casteleijn.openrain',
             ),
             ..._buildRadarFrameLayers(),
             MarkerLayer(
@@ -180,7 +180,7 @@ class _RadarMapState extends State<RadarMap> {
         colorFilter: _radarColorFilter,
         child: tileWidget,
       ),
-      userAgentPackageName: 'com.atmosphere.weather',
+      userAgentPackageName: 'com.casteleijn.openrain',
     );
   }
 }

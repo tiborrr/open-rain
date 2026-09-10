@@ -37,8 +37,19 @@ class PlatformRainNotificationService {
       ),
     );
 
-    // Android 13+ runtime POST_NOTIFICATIONS prompt. On older Android and on
-    // iOS this resolves immediately with the correct status.
+    // Request permissions using plugin implementation
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidImpl?.requestNotificationsPermission();
+
+    final iosImpl = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    await iosImpl?.requestPermissions(
+      alert: true,
+      badge: false,
+      sound: true,
+    );
+
     await Permission.notification.request();
 
     await Workmanager().initialize(_rainCheckCallbackDispatcher);
@@ -142,7 +153,7 @@ String _bodyFor(int untilMin, int durMin) => untilMin <= 1
 // in ios/Runner/AppDelegate.swift — iOS uses the identifier to route
 // BGAppRefreshTasks back to this plugin.
 // -----------------------------------------------------------------------------
-const String _periodicUniqueName = 'com.example.flutter_weather.rainCheck';
+const String _periodicUniqueName = 'com.casteleijn.openrain.rainCheck';
 const String _periodicTaskName = 'rainCheck';
 
 const String _channelId = 'rain_alerts';
