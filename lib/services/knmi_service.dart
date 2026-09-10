@@ -8,7 +8,9 @@ import '../models/weather_models.dart';
 import '../providers/radar_provider.dart';
 import '../utils/cache_store.dart';
 import '../utils/knmi_api_client.dart';
+import '../utils/knmi_raster_tile_cache.dart';
 import '../utils/result.dart';
+import '../utils/throttled_tile_provider.dart';
 import 'knmi_capabilities.dart';
 import 'knmi_gfi.dart';
 
@@ -54,6 +56,12 @@ class KNMIService implements RadarProvider {
   /// `null` or empty value switches back to the anonymous endpoint.
   void setWmsApiKey(String? key) {
     _wmsApiKey = _sanitizeKey(key);
+  }
+
+  @override
+  void invalidateCaches() {
+    KnmiRasterTileCache.instance.clear();
+    KnmiTileProvider.bumpImageCacheGeneration();
   }
 
   static String? _sanitizeKey(String? key) {

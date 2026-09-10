@@ -25,6 +25,30 @@ class WeatherData {
     this.neighbors = const {},
   });
 
+  WeatherData copyWith({
+    CurrentWeather? current,
+    HourlyForecast? hourly,
+    MinutelyForecast? minutely,
+    DailyForecast? daily,
+    Duration? utcOffset,
+    String? timezone,
+    WeatherAlert? alert,
+    AirQuality? airQuality,
+    Map<LatLng, MinutelyForecast>? neighbors,
+  }) {
+    return WeatherData(
+      current: current ?? this.current,
+      hourly: hourly ?? this.hourly,
+      minutely: minutely ?? this.minutely,
+      daily: daily ?? this.daily,
+      utcOffset: utcOffset ?? this.utcOffset,
+      timezone: timezone ?? this.timezone,
+      alert: alert ?? this.alert,
+      airQuality: airQuality ?? this.airQuality,
+      neighbors: neighbors ?? this.neighbors,
+    );
+  }
+
   /// The current time at the weather location.
   DateTime get localNow => DateTime.now().toUtc().add(utcOffset);
 

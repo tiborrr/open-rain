@@ -54,4 +54,10 @@ abstract class RadarProvider {
     required List<RadarFrame> frames,
   }) =>
       Future.value(const Result.ok(null));
+
+  /// Invalidate provider-specific raster tile and decode caches.
+  ///
+  /// Called during manual user refreshes so fresh tiles and imagery are
+  /// requested and decoded on the next frame mount.
+  void invalidateCaches() {}
 }

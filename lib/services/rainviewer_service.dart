@@ -29,6 +29,11 @@ class RainViewerService implements RadarProvider {
   final http.Client _http;
 
   @override
+  void invalidateCaches() {
+    _cache.invalidate(_framesCacheKey);
+  }
+
+  @override
   Future<Result<List<RadarFrame>>> fetchRadarFrames({
     bool forceRefresh = false,
   }) async {

@@ -9,8 +9,6 @@ import '../controllers/radar_controller.dart';
 import '../providers/radar_provider.dart';
 import '../services/knmi_service.dart';
 import '../utils/knmi_api_key_store.dart';
-import '../utils/knmi_raster_tile_cache.dart';
-import '../utils/throttled_tile_provider.dart';
 import '../view_models/home_view_model.dart';
 import '../widgets/air_quality_card.dart';
 import '../widgets/attribution_footer.dart';
@@ -78,11 +76,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (vm == null) return;
 
     if (vm.loadDashboard.completed && vm.radarFrames.isNotEmpty) {
-      _radarController.setFrames(
+      _radarController.updateFrames(
         vm.radarFrames,
         initialTime: DateTime.now().toUtc(),
       );
-      if (!_radarController.isPlaying) _radarController.play();
     }
 
     if (vm.loadDashboard.error) {
@@ -95,14 +92,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// User-initiated refresh. Bust the KNMI tile bytes cache so the next
-  /// frame mount re-decodes fresh imagery, and tell the view-model to force
-  /// a radar-provider cache bypass — otherwise a still-within-TTL but
-  /// semantically stale frame list (e.g. after the app sat idle past the
-  /// 30-min nowcast window) would keep being returned.
+  /// User-initiated refresh.
   void _refreshFromUser() {
-    KnmiRasterTileCache.instance.clear();
-    KnmiTileProvider.bumpImageCacheGeneration();
     context.read<HomeViewModel>().refresh();
   }
 

@@ -6,9 +6,10 @@ import '../models/weather_models.dart';
 import '../providers/weather_provider.dart';
 import '../utils/cache_store.dart';
 import '../utils/result.dart';
+import 'weather_alert_analyzer.dart';
 
 /// Open-Meteo client. Composes 4 endpoints (current/minutely, hourly, daily,
-/// air quality) and parses them into a single [WeatherData] (no alert).
+/// air quality), analyzes severe weather alerts, and returns enriched [WeatherData].
 ///
 /// All endpoints share one [CacheStore]: the previous implementation
 /// inlined identical SharedPreferences logic three times.
@@ -56,21 +57,67 @@ class OpenMeteoService implements WeatherProvider {
       currentMap['latitude'] = minutelyJson['latitude'];
       currentMap['longitude'] = minutelyJson['longitude'];
 
+      final current = CurrentWeather.fromJson(currentMap);
+      final minutely = MinutelyForecast.fromJson(
+        minutelyJson['minutely_15'] as Map<String, dynamic>,
+        offsetSeconds,
+      );
+      final alert = WeatherAlertAnalyzer.analyze(
+        current: current,
+        minutely: minutely,
+      );
+
       return Result.ok(
         WeatherData(
-          current: CurrentWeather.fromJson(currentMap),
-          hourly: HourlyForecast.fromJson(hourlyJson['hourly'] as Map<String, dynamic>, offsetSeconds),
-          minutely: MinutelyForecast.fromJson(
-              minutelyJson['minutely_15'] as Map<String, dynamic>, offsetSeconds),
-          daily: DailyForecast.fromJson(dailyJson['daily'] as Map<String, dynamic>, offsetSeconds),
+          current: current,
+          hourly: HourlyForecast.fromJson(
+            hourlyJson['hourly'] as Map<String, dynamic>,
+            offsetSeconds,
+          ),
+          minutely: minutely,
+          daily: DailyForecast.fromJson(
+            dailyJson['daily'] as Map<String, dynamic>,
+            offsetSeconds,
+          ),
           utcOffset: Duration(seconds: offsetSeconds),
           timezone: minutelyJson['timezone'] as String,
           airQuality: airQualityJson['current'] != null
               ? AirQuality.fromJson(
-                  Map<String, dynamic>.from(airQualityJson['current'] as Map<dynamic, dynamic>))
+                  Map<String, dynamic>.from(
+                    airQualityJson['current'] as Map<dynamic, dynamic>,
+                  ),
+                )
               : null,
+          alert: alert,
         ),
       );
+    } on Exception catch (e) {
+      return Result.err(e);
+    } catch (e) {
+      return Result.err(Exception(e.toString()));
+    }
+  }
+
+  @override
+  Future<Result<MinutelyForecast>> fetchMinutelyForecast({
+    required double lat,
+    required double lon,
+    int forecastSteps = 8,
+    bool useCache = true,
+  }) async {
+    try {
+      final jsonMap = await _fetchMinutelyRaw(
+        lat,
+        lon,
+        forecastSteps: forecastSteps,
+        useCache: useCache,
+      );
+      final offsetSeconds = (jsonMap['utc_offset_seconds'] as num).toInt();
+      final minutely = MinutelyForecast.fromJson(
+        Map<String, dynamic>.from(jsonMap['minutely_15'] as Map),
+        offsetSeconds,
+      );
+      return Result.ok(minutely);
     } on Exception catch (e) {
       return Result.err(e);
     } catch (e) {
@@ -84,6 +131,21 @@ class OpenMeteoService implements WeatherProvider {
     DateTime? start,
     DateTime? end,
   }) async {
+    final forecastSteps = _forecastMinutelyStepsFor(end);
+    return _fetchMinutelyRaw(
+      lat,
+      lon,
+      forecastSteps: forecastSteps,
+      useCache: true,
+    );
+  }
+
+  Future<Map<String, dynamic>> _fetchMinutelyRaw(
+    double lat,
+    double lon, {
+    required int forecastSteps,
+    required bool useCache,
+  }) async {
     // Use count-based windowing (`past_minutely_15` / `forecast_minutely_15`)
     // instead of `start_minutely_15` / `end_minutely_15`.
     //
@@ -94,25 +156,32 @@ class OpenMeteoService implements WeatherProvider {
     // the requested future window for Europe in DST).
     //
     // Counts are timezone-agnostic and always anchored at "now".
-    final forecastSteps = _forecastMinutelyStepsFor(end);
+    final params = <String, String>{
+      'latitude': lat.toString(),
+      'longitude': lon.toString(),
+      'current':
+          'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_gusts_10m',
+      'minutely_15': 'precipitation',
+      'timezone': 'auto',
+      'past_minutely_15': '0',
+      'forecast_minutely_15': forecastSteps.toString(),
+    };
+
+    Future<dynamic> doFetch() => _getJson(
+          Uri.https(_host, '/v1/forecast', params),
+          failure: 'Failed to load minutely weather data',
+        );
+
+    if (!useCache) {
+      final raw = await doFetch();
+      return Map<String, dynamic>.from(raw as Map<dynamic, dynamic>);
+    }
+
     final key = 'weather_minutely_${lat}_${lon}_$forecastSteps';
     final raw = await _cache.getOrFetch(
       key: key,
       expiresAt: CacheExpiration.alignedNext(15, 2),
-      fetch: () async {
-        final params = <String, String>{
-          'latitude': lat.toString(),
-          'longitude': lon.toString(),
-          'current':
-              'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_gusts_10m',
-          'minutely_15': 'precipitation',
-          'timezone': 'auto',
-          'past_minutely_15': '0',
-          'forecast_minutely_15': forecastSteps.toString(),
-        };
-        return _getJson(Uri.https(_host, '/v1/forecast', params),
-            failure: 'Failed to load minutely weather data');
-      },
+      fetch: doFetch,
     );
     return Map<String, dynamic>.from(raw as Map<dynamic, dynamic>);
   }

@@ -4,12 +4,11 @@ import 'package:provider/provider.dart';
 
 import 'providers/radar_provider.dart';
 import 'providers/weather_provider.dart';
-import 'repositories/radar_repository.dart';
-import 'repositories/weather_repository.dart';
 import 'screens/home_screen.dart';
 import 'services/knmi_service.dart';
 import 'services/location_service.dart';
 import 'services/open_meteo_service.dart';
+import 'services/precipitation_nowcast_service.dart';
 import 'services/rain_notification_service.dart';
 import 'theme.dart';
 import 'utils/env.dart';
@@ -75,23 +74,23 @@ class MyApp extends StatelessWidget {
     final radarProvider = KNMIService(
       wmsApiKey: persistedKnmiKey,
     );
-    final weatherRepository = WeatherRepository(weatherProvider);
-    final radarRepository = RadarRepository(radarProvider);
+    final nowcastService = PrecipitationNowcastService(
+      radarProvider: radarProvider,
+      weatherProvider: weatherProvider,
+    );
     final locationService = LocationService();
 
     return MultiProvider(
       providers: [
         Provider<WeatherProvider>.value(value: weatherProvider),
         Provider<RadarProvider>.value(value: radarProvider),
-        Provider<WeatherRepository>.value(value: weatherRepository),
-        Provider<RadarRepository>.value(value: radarRepository),
-        Provider<LocationService>.value(value: locationService),
+        Provider<PrecipitationNowcastService>.value(value: nowcastService),
+        Provider<LocationProvider>.value(value: locationService),
         Provider<RainNotificationService>.value(value: rainNotifications),
         ChangeNotifierProvider<HomeViewModel>(
           create: (_) => HomeViewModel(
-            weatherRepository: weatherRepository,
-            radarRepository: radarRepository,
-            locationService: locationService,
+            nowcastService: nowcastService,
+            locationProvider: locationService,
             onLocationResolved: (lat, lon) => rainNotifications.reportLocation(
               lat: lat,
               lon: lon,

@@ -2,38 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_weather/models/radar_frame.dart';
 import 'package:flutter_weather/models/radar_layer_config.dart';
 import 'package:flutter_weather/models/weather_models.dart';
+import 'package:flutter_weather/providers/location_provider.dart';
 import 'package:flutter_weather/providers/radar_provider.dart';
 import 'package:flutter_weather/providers/weather_provider.dart';
-import 'package:flutter_weather/repositories/radar_repository.dart';
-import 'package:flutter_weather/repositories/weather_repository.dart';
-import 'package:flutter_weather/services/location_service.dart';
+import 'package:flutter_weather/services/precipitation_nowcast_service.dart';
 import 'package:flutter_weather/utils/result.dart';
 import 'package:flutter_weather/view_models/home_view_model.dart';
-import 'package:geolocator/geolocator.dart';
 
-class _FixedLocationService extends LocationService {
+class _FixedLocationProvider implements LocationProvider {
   @override
-  Future<Position> getCurrentPosition() async => _pos(52.0, 5.0);
-
-  @override
-  Future<String?> getCityFromCoordinates(double lat, double lon) async =>
-      'Test';
+  Future<ResolvedLocation> getCurrentLocation() async =>
+      const ResolvedLocation(lat: 52.0, lon: 5.0, name: 'Test');
 
   @override
-  Stream<Position> getPositionStream() => const Stream.empty();
+  Stream<ResolvedLocation> getSignificantLocationUpdates({
+    double minDistanceMeters = 100.0,
+  }) =>
+      const Stream.empty();
 
-  Position _pos(double lat, double lon) => Position(
-    latitude: lat,
-    longitude: lon,
-    timestamp: DateTime.now(),
-    accuracy: 0,
-    altitude: 0,
-    heading: 0,
-    speed: 0,
-    speedAccuracy: 0,
-    altitudeAccuracy: 0,
-    headingAccuracy: 0,
-  );
+  @override
+  Future<Result<List<LocationResult>>> searchLocations(String query) async =>
+      const Result.ok([]);
 }
 
 class _OpenMeteoWithMinutely implements WeatherProvider {
@@ -78,6 +67,24 @@ class _OpenMeteoWithMinutely implements WeatherProvider {
       ),
     );
   }
+
+  @override
+  Future<Result<MinutelyForecast>> fetchMinutelyForecast({
+    required double lat,
+    required double lon,
+    int forecastSteps = 8,
+    bool useCache = true,
+  }) async {
+    return Result.ok(
+      MinutelyForecast(
+        times: [
+          DateTime.utc(2024, 4, 2, 12),
+          DateTime.utc(2024, 4, 2, 12, 15),
+        ],
+        precipitation: const [0.25, 0.5],
+      ),
+    );
+  }
 }
 
 class _KnmiStyleRadar implements RadarProvider {
@@ -94,6 +101,9 @@ class _KnmiStyleRadar implements RadarProvider {
   @override
   RadarLayerConfig getLayerConfig(RadarFrame frame) =>
       RadarLayerConfig(urlTemplate: 'https://example/{z}/{x}/{y}.png');
+
+  @override
+  void invalidateCaches() {}
 
   @override
   Future<Result<MinutelyForecast?>> fetchPrecipitationSeries({
@@ -124,9 +134,11 @@ void main() {
     'HomeViewModel uses KNMI GFI minutely for chart when available',
     () async {
       final vm = HomeViewModel(
-        weatherRepository: WeatherRepository(_OpenMeteoWithMinutely()),
-        radarRepository: RadarRepository(_KnmiStyleRadar()),
-        locationService: _FixedLocationService(),
+        nowcastService: PrecipitationNowcastService(
+          radarProvider: _KnmiStyleRadar(),
+          weatherProvider: _OpenMeteoWithMinutely(),
+        ),
+        locationProvider: _FixedLocationProvider(),
       );
 
       await vm.loadDashboard.execute(
@@ -142,9 +154,11 @@ void main() {
     'HomeViewModel falls back to Open-Meteo minutely when KNMI GFI is empty',
     () async {
       final vm = HomeViewModel(
-        weatherRepository: WeatherRepository(_OpenMeteoWithMinutely()),
-        radarRepository: RadarRepository(_NoKnmiSeriesRadar()),
-        locationService: _FixedLocationService(),
+        nowcastService: PrecipitationNowcastService(
+          radarProvider: _NoKnmiSeriesRadar(),
+          weatherProvider: _OpenMeteoWithMinutely(),
+        ),
+        locationProvider: _FixedLocationProvider(),
       );
 
       await vm.loadDashboard.execute(

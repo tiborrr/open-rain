@@ -1,15 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
 
-import '../constants/neighbor_sampling_constants.dart';
+import '../models/precipitation_nowcast.dart';
 import '../models/radar_frame.dart';
 import '../models/weather_models.dart';
-import '../repositories/radar_repository.dart';
-import '../repositories/weather_repository.dart';
-import '../services/location_service.dart';
+import '../providers/location_provider.dart';
+import '../services/precipitation_nowcast_service.dart';
 import '../utils/command.dart';
 import '../utils/result.dart';
 
@@ -40,41 +37,28 @@ class LocationSelection {
 ///   * [searchCities]   — `Command1<List<LocationResult>, String>`
 class HomeViewModel extends ChangeNotifier {
   HomeViewModel({
-    required WeatherRepository weatherRepository,
-    required RadarRepository radarRepository,
-    required LocationService locationService,
+    required PrecipitationNowcastService nowcastService,
+    required LocationProvider locationProvider,
     Future<void> Function(double lat, double lon)? onLocationResolved,
-  }) : _weatherRepository = weatherRepository,
-       _radarRepository = radarRepository,
-       _locationService = locationService,
-       _onLocationResolved = onLocationResolved {
+  })  : _nowcastService = nowcastService,
+        _locationProvider = locationProvider,
+        _onLocationResolved = onLocationResolved {
     loadDashboard = Command1<void, LocationSelection?>(_loadDashboard);
     searchCities = Command1<List<LocationResult>, String>(_searchCities);
     _initLocationListener();
   }
 
-  // Fallback used when GPS is denied/disabled.
-  static const double _fallbackLat = 52.3676;
-  static const double _fallbackLon = 4.9041;
-  static const String _fallbackLocationName = 'Amsterdam (Default)';
-  static const String _fallbackWarning =
-      'Location disabled. Using Amsterdam as default. '
-      'Enable location in System Settings for your local weather.';
-
-  static const double _moveThresholdMeters = 100.0;
-
-  final WeatherRepository _weatherRepository;
-  final RadarRepository _radarRepository;
-  final LocationService _locationService;
+  final PrecipitationNowcastService _nowcastService;
+  final LocationProvider _locationProvider;
 
   /// Optional callback fired whenever the dashboard has resolved a
   /// concrete (lat, lon). The rain notification service subscribes to this
   /// so the background task always has a recent coordinate to query.
   final Future<void> Function(double lat, double lon)? _onLocationResolved;
 
-  StreamSubscription<Position>? _locationSubscription;
+  StreamSubscription<ResolvedLocation>? _locationSubscription;
+  StreamSubscription<PrecipitationNowcast>? _nowcastSubscription;
   bool _useGps = true;
-  Position? _lastUpdatePosition;
 
   /// Set by [refresh] so the *next* dashboard load bypasses the radar cache.
   /// Consumed (and cleared) inside [_loadDashboard] to avoid sticky forced
@@ -85,7 +69,6 @@ class HomeViewModel extends ChangeNotifier {
   List<RadarFrame> _radarFrames = const [];
   String _currentLocationName = 'Unknown Location';
   String? _locationFallbackMessage;
-  final Map<LatLng, MinutelyForecast> _neighborForecasts = {};
 
   /// Run the dashboard load. Argument `null` ⇒ resolve via GPS.
   late final Command1<void, LocationSelection?> loadDashboard;
@@ -132,6 +115,7 @@ class HomeViewModel extends ChangeNotifier {
   /// pinned a manual location, we refresh *that* location.
   Future<void> refresh({LocationSelection? selection}) {
     _forceRadarRefresh = true;
+    _nowcastService.invalidateCaches();
     return loadDashboard.execute(selection);
   }
 
@@ -140,29 +124,16 @@ class HomeViewModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   void _initLocationListener() {
-    _locationSubscription = _locationService.getPositionStream().listen(
-      (position) {
+    _locationSubscription = _locationProvider
+        .getSignificantLocationUpdates()
+        .listen(
+      (location) {
         if (!_useGps || loadDashboard.running) return;
-        if (_lastUpdatePosition != null) {
-          final distance = Geolocator.distanceBetween(
-            _lastUpdatePosition!.latitude,
-            _lastUpdatePosition!.longitude,
-            position.latitude,
-            position.longitude,
-          );
-          if (distance < _moveThresholdMeters) {
-            debugPrint(
-              'Skip dashboard refresh: User moved only ${distance.toStringAsFixed(1)}m',
-            );
-            return;
-          }
-        }
-        _lastUpdatePosition = position;
         loadDashboard.execute(
           LocationSelection(
-            lat: position.latitude,
-            lon: position.longitude,
-            name: _currentLocationName,
+            lat: location.lat,
+            lon: location.lon,
+            name: location.name,
           ),
         );
       },
@@ -175,6 +146,7 @@ class HomeViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _locationSubscription?.cancel();
+    _nowcastSubscription?.cancel();
     loadDashboard.dispose();
     searchCities.dispose();
     super.dispose();
@@ -186,6 +158,8 @@ class HomeViewModel extends ChangeNotifier {
 
   Future<Result<void>> _loadDashboard(LocationSelection? selection) async {
     _locationFallbackMessage = null;
+    await _nowcastSubscription?.cancel();
+    _nowcastSubscription = null;
 
     final resolved = await _resolveLocation(selection);
     final lat = resolved.lat;
@@ -197,110 +171,40 @@ class HomeViewModel extends ChangeNotifier {
 
     final forceRadar = _forceRadarRefresh;
     _forceRadarRefresh = false;
-    final framesResult = await _radarRepository.getRadarFrames(
-      forceRefresh: forceRadar,
-    );
-    final allFrames = framesResult.valueOrNull ?? const <RadarFrame>[];
-    if (framesResult is Err<List<RadarFrame>>) {
-      debugPrint('Failed to get radar frames: ${framesResult.error}');
-    }
 
-    // Hand Open-Meteo a horizon hint covering the last KNMI frame; the
-    // service rounds this up to the next 15-min `forecast_minutely_15` step.
-    final endHint = allFrames.isNotEmpty ? allFrames.last.time : null;
+    final completer = Completer<Result<void>>();
 
-    final weatherResult = await _weatherRepository.getWeatherData(
-      lat: lat,
-      lon: lon,
-      endTime: endHint,
-    );
-    return switch (weatherResult) {
-      Ok<WeatherData>(value: final data) => await _onWeatherDataLoaded(
-        data: data,
-        allFrames: allFrames,
-        lat: lat,
-        lon: lon,
-      ),
-      Err<WeatherData>(error: final e) => Result<void>.err(e),
-    };
+    _nowcastSubscription = _nowcastService
+        .getNowcast(
+          lat: lat,
+          lon: lon,
+          forceRefresh: forceRadar,
+        )
+        .listen(
+          (nowcast) {
+            _radarFrames = nowcast.frames;
+            _weatherData = nowcast.weather;
+            notifyListeners();
+
+            if (!completer.isCompleted) {
+              completer.complete(const Result<void>.ok(null));
+            }
+          },
+          onError: (Object error) {
+            debugPrint('Nowcast stream error: $error');
+            if (!completer.isCompleted) {
+              completer.complete(Result<void>.err(
+                error is Exception ? error : Exception(error.toString()),
+              ));
+            }
+          },
+        );
+
+    return completer.future;
   }
 
-  Future<Result<void>> _onWeatherDataLoaded({
-    required WeatherData data,
-    required List<RadarFrame> allFrames,
-    required double lat,
-    required double lon,
-  }) async {
-    final chartForecast = await _resolveChartForecast(
-      lat: lat,
-      lon: lon,
-      frames: allFrames,
-      fallback: data.minutely,
-    );
-    // Keep radar playback and chart timeline in the same UTC window by
-    // clipping KNMI frames to the chosen chart series (KNMI when available,
-    // otherwise Open-Meteo fallback).
-    _radarFrames = _alignFramesToMinutely(allFrames, chartForecast);
-    _weatherData = _withNeighbors(_withChartForecast(data, chartForecast));
-    notifyListeners();
-    if (_radarFrames.isNotEmpty) {
-      unawaited(_fetchNeighbors(lat, lon, _radarFrames));
-    }
-    return const Result<void>.ok(null);
-  }
-
-  Future<MinutelyForecast> _resolveChartForecast({
-    required double lat,
-    required double lon,
-    required List<RadarFrame> frames,
-    required MinutelyForecast fallback,
-  }) async {
-    if (frames.isEmpty) return fallback;
-    final result = await _radarRepository.getPrecipitationSeries(
-      lat: lat,
-      lon: lon,
-      frames: frames,
-    );
-    return switch (result) {
-      Ok<MinutelyForecast?>(value: final forecast)
-          when _isUsableForecast(forecast) =>
-        forecast!,
-      Ok<MinutelyForecast?>(value: _) => fallback,
-      Err<MinutelyForecast?>(error: final e) => () {
-        debugPrint('Failed to get center KNMI precipitation: $e');
-        return fallback;
-      }(),
-    };
-  }
-
-  static bool _isUsableForecast(MinutelyForecast? forecast) {
-    if (forecast == null) return false;
-    if (forecast.times.isEmpty || forecast.precipitation.isEmpty) return false;
-    return forecast.times.length == forecast.precipitation.length;
-  }
-
-  static List<RadarFrame> _alignFramesToMinutely(
-    List<RadarFrame> frames,
-    MinutelyForecast minutely,
-  ) {
-    if (frames.isEmpty || minutely.times.isEmpty) return frames;
-    final start = minutely.times.first;
-    final end = minutely.times.last;
-    return [
-      for (final f in frames)
-        if (!f.time.isBefore(start) && !f.time.isAfter(end)) f,
-    ];
-  }
-
-  Future<Result<List<LocationResult>>> _searchCities(String query) async {
-    try {
-      final results = await _locationService.searchLocations(query);
-      return Result.ok(results);
-    } on Exception catch (e) {
-      return Result.err(e);
-    } catch (e) {
-      return Result.err(Exception(e.toString()));
-    }
+  Future<Result<List<LocationResult>>> _searchCities(String query) {
+    return _locationProvider.searchLocations(query);
   }
 
   // ---------------------------------------------------------------------------
@@ -314,103 +218,12 @@ class HomeViewModel extends ChangeNotifier {
       return (lat: selection.lat, lon: selection.lon, name: selection.name);
     }
 
-    try {
-      final position = await _locationService.getCurrentPosition();
-      final city = await _locationService.getCityFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      return (
-        lat: position.latitude,
-        lon: position.longitude,
-        name: city ?? 'Current Location',
-      );
-    } catch (_) {
-      _locationFallbackMessage = _fallbackWarning;
-      return (
-        lat: _fallbackLat,
-        lon: _fallbackLon,
-        name: _fallbackLocationName,
-      );
-    }
-  }
-
-  WeatherData _withNeighbors(WeatherData data) {
-    return WeatherData(
-      current: data.current,
-      hourly: data.hourly,
-      minutely: data.minutely,
-      daily: data.daily,
-      utcOffset: data.utcOffset,
-      timezone: data.timezone,
-      alert: data.alert,
-      airQuality: data.airQuality,
-      neighbors: Map.from(_neighborForecasts),
+    final resolved = await _locationProvider.getCurrentLocation();
+    _locationFallbackMessage = resolved.fallbackMessage;
+    return (
+      lat: resolved.lat,
+      lon: resolved.lon,
+      name: resolved.name,
     );
-  }
-
-  WeatherData _withChartForecast(WeatherData data, MinutelyForecast minutely) {
-    return WeatherData(
-      current: data.current,
-      hourly: data.hourly,
-      minutely: minutely,
-      daily: data.daily,
-      utcOffset: data.utcOffset,
-      timezone: data.timezone,
-      alert: data.alert,
-      airQuality: data.airQuality,
-      neighbors: data.neighbors,
-    );
-  }
-
-  Future<void> _fetchNeighbors(
-    double lat,
-    double lon,
-    List<RadarFrame> frames,
-  ) async {
-    _neighborForecasts.clear();
-
-    const step = NeighborSamplingConstants.gridStepDegrees;
-    final offsets = [-step, 0.0, step];
-    final points = <LatLng>[
-      for (final dLat in offsets)
-        for (final dLon in offsets)
-          if (dLat != 0 || dLon != 0) LatLng(lat + dLat, lon + dLon),
-    ];
-
-    points.sort((a, b) {
-      final distA = Geolocator.distanceBetween(
-        lat,
-        lon,
-        a.latitude,
-        a.longitude,
-      );
-      final distB = Geolocator.distanceBetween(
-        lat,
-        lon,
-        b.latitude,
-        b.longitude,
-      );
-      return distA.compareTo(distB);
-    });
-
-    for (final point in points) {
-      final result = await _radarRepository.getPrecipitationSeries(
-        lat: point.latitude,
-        lon: point.longitude,
-        frames: frames,
-      );
-      switch (result) {
-        case Ok<MinutelyForecast?>(value: final forecast):
-          if (forecast == null) continue;
-          _neighborForecasts[point] = forecast;
-          if (_weatherData != null) {
-            _weatherData = _withNeighbors(_weatherData!);
-            notifyListeners();
-          }
-        case Err<MinutelyForecast?>(error: final e):
-          debugPrint('Background neighbor fetch failed for $point: $e');
-      }
-    }
   }
 }

@@ -2,39 +2,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_weather/models/radar_frame.dart';
 import 'package:flutter_weather/models/radar_layer_config.dart';
 import 'package:flutter_weather/models/weather_models.dart';
+import 'package:flutter_weather/providers/location_provider.dart';
 import 'package:flutter_weather/providers/radar_provider.dart';
 import 'package:flutter_weather/providers/weather_provider.dart';
-import 'package:flutter_weather/repositories/radar_repository.dart';
-import 'package:flutter_weather/repositories/weather_repository.dart';
-import 'package:flutter_weather/services/location_service.dart';
+import 'package:flutter_weather/services/precipitation_nowcast_service.dart';
 import 'package:flutter_weather/utils/result.dart';
 import 'package:flutter_weather/view_models/home_view_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
-class MockLocationService extends LocationService {
+class MockLocationProvider implements LocationProvider {
   @override
-  Future<Position> getCurrentPosition() async => _pos(52.3676, 4.9041);
+  Future<ResolvedLocation> getCurrentLocation() async =>
+      const ResolvedLocation(lat: 52.3676, lon: 4.9041, name: 'Amsterdam');
 
   @override
-  Future<String?> getCityFromCoordinates(double lat, double lon) async =>
-      'Amsterdam';
+  Stream<ResolvedLocation> getSignificantLocationUpdates({
+    double minDistanceMeters = 100.0,
+  }) =>
+      const Stream.empty();
 
   @override
-  Stream<Position> getPositionStream() => const Stream.empty();
-
-  Position _pos(double lat, double lon) => Position(
-    latitude: lat,
-    longitude: lon,
-    timestamp: DateTime.now(),
-    accuracy: 0,
-    altitude: 0,
-    heading: 0,
-    speed: 0,
-    speedAccuracy: 0,
-    altitudeAccuracy: 0,
-    headingAccuracy: 0,
-  );
+  Future<Result<List<LocationResult>>> searchLocations(String query) async =>
+      const Result.ok([]);
 }
 
 class MockWeatherProvider implements WeatherProvider {
@@ -73,6 +63,18 @@ class MockWeatherProvider implements WeatherProvider {
       ),
     );
   }
+
+  @override
+  Future<Result<MinutelyForecast>> fetchMinutelyForecast({
+    required double lat,
+    required double lon,
+    int forecastSteps = 8,
+    bool useCache = true,
+  }) async {
+    return Result.ok(
+      MinutelyForecast(times: const [], precipitation: const []),
+    );
+  }
 }
 
 class MockRadarProvider implements RadarProvider {
@@ -88,6 +90,9 @@ class MockRadarProvider implements RadarProvider {
   @override
   RadarLayerConfig getLayerConfig(RadarFrame frame) =>
       RadarLayerConfig(urlTemplate: 'https://example/{z}/{x}/{y}.png');
+
+  @override
+  void invalidateCaches() {}
 
   @override
   Future<Result<MinutelyForecast?>> fetchPrecipitationSeries({
@@ -109,13 +114,14 @@ void main() {
     'HomeViewModel should fetch center first, then neighbors by distance',
     () async {
       final mockRadarProvider = MockRadarProvider();
-      final radarRepo = RadarRepository(mockRadarProvider);
-      final weatherRepo = WeatherRepository(MockWeatherProvider());
+      final nowcastService = PrecipitationNowcastService(
+        radarProvider: mockRadarProvider,
+        weatherProvider: MockWeatherProvider(),
+      );
 
       final viewModel = HomeViewModel(
-        weatherRepository: weatherRepo,
-        radarRepository: radarRepo,
-        locationService: MockLocationService(),
+        nowcastService: nowcastService,
+        locationProvider: MockLocationProvider(),
       );
 
       await viewModel.loadDashboard.execute(

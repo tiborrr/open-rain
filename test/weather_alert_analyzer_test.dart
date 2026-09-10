@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_weather/models/weather_models.dart';
-import 'package:flutter_weather/repositories/weather_alert_analyzer.dart';
+import 'package:flutter_weather/services/weather_alert_analyzer.dart';
 
 CurrentWeather _current({double temp = 20, double gust = 5}) => CurrentWeather(
       temperature: temp,

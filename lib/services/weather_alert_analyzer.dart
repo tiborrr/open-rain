@@ -1,9 +1,6 @@
 import '../models/weather_models.dart';
 
 /// Pure rules that turn parsed weather signals into a [WeatherAlert].
-///
-/// Lifted out of `WeatherRepository` so it can be unit-tested independently
-/// and reused by other repositories (e.g. a future combined NL/EU source).
 abstract final class WeatherAlertAnalyzer {
   WeatherAlertAnalyzer._();
 
